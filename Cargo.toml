@@ -1,0 +1,13 @@
+[package]
+name = "LeNet_FromScratch"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ndarray = "0.17.2"
+csv = "1.4.0"
+serde = { version = "1.0.228", features = ["derive"] }
+rand = "0.10.0"
+ndarray-rand = "0.16.0"
+rand_chacha = "0.9.0"
+rand_distr = "0.5.1"
