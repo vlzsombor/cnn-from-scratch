@@ -1,11 +1,11 @@
-﻿use ndarray::{Array1, Array2};
-use crate::train::layer::Layer;
+﻿use crate::train::layer::Layer;
+use ndarray::Array2;
 
-struct node_container{
-    Layers: Vec<Layer>
+struct NodeContainer {
+    layers: Vec<Layer>
 }
 
-impl node_container{
+impl NodeContainer {
 
     pub fn new(layer_number: Vec<[u32; 2]>) -> Self {
         let layers: Vec<Layer> = layer_number.iter().map(|x|{
@@ -13,18 +13,18 @@ impl node_container{
             let b = x[1];
             Layer::new(a,b, None, None)
         }).collect();
-        node_container{
-            Layers: layers
+        NodeContainer {
+            layers
         }
     }
-
+    #[allow(non_snake_case)]
     pub fn forward(&self, X: Array2<f32>) -> Array2<f32>{
-//        self.Layers
+//        self.layers
 //            .iter()
 //            .for_each(|x|{
 //                x.forward()
 //            });
-        self.Layers
+        self.layers
             .iter()
             .fold(X, |acc, layer| {
                 layer.forward(&acc)
@@ -35,14 +35,14 @@ impl node_container{
 
 #[cfg(test)]
 mod tests {
+    use crate::train::node_container::NodeContainer;
     use ndarray::Array2;
-    use crate::train::node_container::node_container;
 
     #[test]
     pub fn test1()
     {
         let layer_number = vec![[3,2],[2,1]];
-        let sut = node_container::new(layer_number);
+        let sut = NodeContainer::new(layer_number);
         let input: Array2<f32> = Array2::from(vec![[1.,2.,3.], [5.,6.,7.], [9.,10.,11.], [20.,300.,200000.]]);
         let input: Array2<f32> = Array2::from(vec![
             [10.,0., 10.],

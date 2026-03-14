@@ -1,6 +1,6 @@
-use ndarray::{array, Array2};
 use crate::input_transform::{normalize_image_pixels_vec, process_csv};
-use crate::train::layer::{Layer, ReLU};
+use crate::train::layer::Layer;
+use ndarray::Array2;
 
 mod input_transform;
 pub mod train;
@@ -16,5 +16,5 @@ fn main() {
     let a: Array2<f32> = Array2::from(vec![[4.0], [1.0]]);
 
     let res = nnlayer1.forward(&a);
-    print!("result: {}\n", res);
+    println!("result: {}", res);
 }
