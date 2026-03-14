@@ -35,8 +35,9 @@ impl NodeContainer {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_abs_diff_eq;
     use crate::train::node_container::NodeContainer;
-    use ndarray::Array2;
+    use ndarray::{array, Array2};
 
     #[test]
     pub fn test1()
@@ -51,9 +52,14 @@ mod tests {
             [100000.,10000., 100000.],
             [100000.,10000., 100000.]
         ]);
-//        let input: Array2<f32> =  Array2::from(vec![[1.,2.,3.,4.], [5.,6.,7.,8.], [9.,10.,11.,20.]]);
         let res = sut.forward(input);
-        println!("res \n{:#?}", res);
-
+        let expected :Array2<f32>= array![
+            [6.529471],
+            [12.884275],
+            [59731.12],
+            [59731.12],
+            [59731.12]
+        ];
+        assert_abs_diff_eq!(&res, &expected, epsilon = 1e-4);
     }
 }
