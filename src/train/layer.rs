@@ -62,11 +62,10 @@ mod tests {
         let layer1 = Layer::new(3, 4, Some(ReLU), Some(42));
         assert_eq!(layer1.weights.shape(), &[3, 4]);
         let nnlayer1 = Layer::new(2, 2, Some(ReLU), Some(42));
-        let input: Array2<f32> = Array2::from(vec![[4.0], [1.0]]);
+        let input: Array2<f32> = Array2::from(vec![[4.0, 2.0], [3.0, 2.0]]);
         let res = nnlayer1.forward(&input);
-        let b :Array2<f32>= array![[2.4382143, 6.549785]];
-        println!("end res:   {}", res);
-        assert_abs_diff_eq!(&res, &b, epsilon = 1e-4);
+        let expected :Array2<f32>= array! [[2.2273476, 7.026132], [1.7493664, 5.6920614]];
+        assert_abs_diff_eq!(&res, &expected, epsilon = 1e-4);
     }
 
     #[test]
