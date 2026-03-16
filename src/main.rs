@@ -1,5 +1,5 @@
 use crate::input_transform::{normalize_image_pixels_vec, process_csv};
-use crate::train::layer::Layer;
+use crate::train::layer::{Activation, Layer, ReLU};
 use ndarray::Array2;
 
 mod input_transform;
@@ -12,7 +12,7 @@ fn main() {
     let r = process_csv("src/data/mnist_train_small.csv").unwrap();
     let normalized = normalize_image_pixels_vec(&r, U8_UPPER);
 
-    let nnlayer1 = Layer::new(2, 2, None, None);
+    let mut nnlayer1 = Layer::new(2, 2, Some(Activation::Relu()), None);
     let a: Array2<f32> = Array2::from(vec![[4.0], [1.0]]);
 
     let res = nnlayer1.forward(&a);
