@@ -18,3 +18,6 @@ fn main() {
     let res = nnlayer1.forward(&a);
     println!("result: {}", res);
 }
+
+
+

@@ -34,10 +34,12 @@ impl NodeContainer {
             })
     }
     //3 2 2
-    pub fn backward_def(&self, X: Array1<f32>) -> Array1<f32>{
-
-        todo!();
-
+    pub fn backward_def(&mut self, X: Array1<f32>) {
+        self.layers
+            .iter_mut()
+            .fold(X, |acc, layer| {
+                layer.back_propagation(&acc)
+            });
     }
 }
 

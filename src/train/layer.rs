@@ -1,5 +1,6 @@
 ﻿use std::ops::SubAssign;
 use ndarray::{Array, Array1, Array2};
+use ndarray::linalg::Dot;
 use ndarray_rand::rand::{Rng, SeedableRng};
 use ndarray_rand::rand_distr::StandardNormal;
 use ndarray_rand::RandomExt;
@@ -83,15 +84,16 @@ impl Layer {
 //        });
         (&r + &self.bias).mapv(|x| (self.activation.activation)(x))
     }
-    pub fn back_propagation(&mut self, grad_output: &Array1<f32>) -> (Array2<f32>, Array1<f32>)
+    pub fn back_propagation(&mut self, grad_output: &Array1<f32>) -> Array1<f32>
     {
         let dact_dz = grad_output.mapv(|x|(self.activation.derivative_activation)(x));
         let dz_dw:Array2<f32> = &dact_dz * &self.input;
-        let dz_db = dact_dz;
-        let dz_dactPrevious = &self.weights.clone();
-//        self.weights.map_mut(|w| w.sub_assign(dz_dw));
-        self.bias=-dz_db;
-        todo!()
+        let dz_db = &dact_dz;
+        let dz_dactPrevious = self.weights.clone();
+        self.weights = &self.weights - dz_dw;
+        self.bias = &self.bias - dz_db;
+
+        dact_dz.dot(&dz_dactPrevious)
     }
 }
 #[allow(non_snake_case)]
