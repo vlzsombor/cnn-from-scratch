@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use crate::input_transform::{normalize_image_pixels_vec, process_csv};
-use crate::train::LayerContainer::{LayerContainer};
+use crate::train::LayerContainer::{loss, loss_derivate, LayerContainer};
 use ndarray::{array, Array, Array1, Array2, Axis};
 use crate::train::layer::{Activation, Layer};
 
@@ -17,6 +17,43 @@ fn main() {
 
 //    let r = load_iris("src/data/Iris.csv").unwrap();
 //    let b = train(&r);
+
+
+
+
+
+    let layers = vec![
+        Layer::new(2,2, Some(Activation::Relu()),None),
+        //            Layer::new(2,1, Some(Activation::Relu()),None),
+    ];
+    let mut sut = LayerContainer::new_layers(layers);
+    let input = array![[1.,1.], [5.,5.]];
+    let y = array![[1.,3.], [8.,6.],[48.,11.], [224.,19.]];
+    let y = array![[2.,2.], [5., 5.]];
+
+    let mut y_hat = sut.forward(&input);
+    //        let loss: Array2<f32> = 1./(y_hat.nrows() as f32) * (y_hat - y);
+    let l1 = loss(&y_hat, &y);
+    for _ in 0..10{
+        y_hat = sut.forward(&input);
+        sut.backward_hard_coded(&loss_derivate(&y_hat, &y));
+    }
+    let l2 = loss(&y_hat, &y);
+    dbg!(l1);
+    dbg!(l2);
+
+
+
+
+    return;
+
+
+    let epsilon = 1e-5;
+
+
+
+
+
 
     let xor_input = array![[0.,0.], [0.,1.],[1.,0.], [1.,1.]];
     let y = array![[0.,1.], [1.,0.],[1.,0.], [0.,1.]];

@@ -23,7 +23,7 @@ pub struct Activation{
     activation: fn(Array1<f32>) -> Array1<f32>,
     derivative_activation: fn(Array1<f32>) -> Array1<f32>,
 }
-pub const ALPHA: f32 = 0.01;
+pub const ALPHA: f32 = 0.0001;
 impl Activation {
     pub fn Empty() -> Self{
         Activation{
@@ -41,7 +41,6 @@ impl Activation {
         }
     }
     pub fn Relu() -> Self{
-        return Self::Empty();
         Activation{
             activation: Self::ReLU,
             derivative_activation: Self::ReLU_derivative
@@ -63,7 +62,6 @@ impl Activation {
     #[allow(non_snake_case)]
     fn ReLU(x: Array1<f32>) -> Array1<f32>
     {
-
         x.mapv(|xi| xi.max(0.0))
     }
 
@@ -81,17 +79,17 @@ impl Layer {
         let activation = activation.unwrap_or(Activation::Empty());
 
         let state = state.unwrap_or(42);
-        let mut rng = ChaCha8Rng::seed_from_u64(state); // fixed seed
-        let weights = Array2::random_using(
+//        let mut rng = ChaCha8Rng::seed_from_u64(state); // fixed seed
+        let weights = Array2::random(
             (number_of_inputs as usize, number_of_nodes as usize),
             StandardNormal,
-            &mut rng
+//            &mut rng
         );
 //        let bias: f32 = rng.random();
-        let bias: Array1<f32> =  Array1::random_using(
+        let bias: Array1<f32> =  Array1::random(
             (number_of_nodes as usize),
             StandardNormal,
-            &mut rng
+//            &mut rng
         );
         Layer {
             number_of_inputs,
@@ -134,21 +132,19 @@ impl Layer {
             (&self.activation.derivative_activation)(x.to_owned())
         });
         let dact_dz = Self::to_array2(dact_dz);
-        println!();
-        println!();
-        println!();
-        println!();
-
         let dz_db = 1.;
-        //let w_delta = (dL_dact * &dact_dz * dz_dw);
 
         let delta = dL_dact * &dact_dz;                          // (batch, n_out)
         let b_delta = delta.mean_axis(Axis(0)).unwrap() * dz_db;          // (n_out,)
-        let w_delta = delta.t().dot(&self.input) / (delta.nrows() as f32);   // (n_out, n_in)
-        self.bias = &self.bias - b_delta;
-        println!("{:#?}", delta);
-        println!("{:#?}", delta.nrows());
-        self.weights = &self.weights - w_delta;
+        let w_delta = delta.t().dot(&self.input) / (delta.ncols() as f32);   // (n_out, n_in)
+        self.bias = &self.bias - ALPHA * b_delta;
+//        println!();
+//        println!("{:#?}", self.weights);
+
+//        dbg!(&w_delta);
+//        dbg!(&self.weights);
+        self.weights = &self.weights - ALPHA * w_delta.to_owned();
+//        dbg!(&self.weights);
     }
 
     pub fn back_prop2(&mut self, grad_output: &Array2<f32>) -> Array2<f32>
