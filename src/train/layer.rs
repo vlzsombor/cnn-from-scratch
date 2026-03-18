@@ -1,10 +1,11 @@
-﻿use std::ops::SubAssign;
-use ndarray::{Array, Array1, Array2};
+﻿use std::ops::{Mul, SubAssign};
+use ndarray::{stack, Array, Array1, Array2, Axis, Ix1};
 use ndarray::linalg::Dot;
 use ndarray_rand::rand::{Rng, SeedableRng};
 use ndarray_rand::rand_distr::StandardNormal;
 use ndarray_rand::RandomExt;
 use rand_chacha::ChaCha8Rng;
+use crate::train::loss_functions::softmax;
 
 #[derive(Debug)]
 pub struct Layer
@@ -14,29 +15,60 @@ pub struct Layer
     activation: Activation,
     weights: Array2<f32>,
     bias: Array1<f32>,
-    input: Array2<f32>
+    input: Array2<f32>,
+    z: Array2<f32>
 }
 #[derive(Debug)]
 pub struct Activation{
-    activation: fn(f32) -> f32,
-    derivative_activation: fn(f32) -> f32,
+    activation: fn(Array1<f32>) -> Array1<f32>,
+    derivative_activation: fn(Array1<f32>) -> Array1<f32>,
 }
+pub const ALPHA: f32 = 0.01;
 impl Activation {
     pub fn Empty() -> Self{
         Activation{
-            activation: empty_activation,
-            derivative_activation: |_| 1.
-        }
-    }
-    pub fn Relu() -> Self{
-        Activation{
-            activation: ReLU,
-            derivative_activation: Self::relu_derivative
+            activation: Self::empty,
+            derivative_activation: |x| {
+                Array1::ones(x.len())
+            }
         }
     }
 
-    pub fn relu_derivative(x: f32) -> f32 {
-        if x < 0. { 1.0 } else { 0.0 }
+    pub fn MSE() -> Self{
+        Activation{
+            activation: Self::ReLU,
+            derivative_activation: Self::ReLU_derivative
+        }
+    }
+    pub fn Relu() -> Self{
+        return Self::Empty();
+        Activation{
+            activation: Self::ReLU,
+            derivative_activation: Self::ReLU_derivative
+        }
+    }
+
+    pub fn Softmax() -> Self{
+        Activation{
+            activation: softmax,
+            derivative_activation: |x| Array1::ones(x.len())
+        }
+    }
+
+    #[allow(non_snake_case)]
+    fn ReLU_derivative(x: Array1<f32>) -> Array1<f32>
+    {
+        x.mapv(|xi| if xi < 0. { 0. } else { 1.0 })
+    }
+    #[allow(non_snake_case)]
+    fn ReLU(x: Array1<f32>) -> Array1<f32>
+    {
+
+        x.mapv(|xi| xi.max(0.0))
+    }
+
+    fn empty(x: Array1<f32>) -> Array1<f32>{
+        x
     }
 }
 trait LayerTrait {
@@ -67,7 +99,8 @@ impl Layer {
             activation,
             weights,
             bias,
-            input: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
+            input: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize)),
+            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
         }
     }
     #[allow(non_snake_case)]
@@ -75,36 +108,87 @@ impl Layer {
     {
         let r = X.dot(&self.weights);
         self.input = X.clone();
-
 //        let mut i =0;
 //        r.mapv(|x| {
 //            let ret = (self.activation.activation)(x + self.bias[i]);
 //            i = i + 1;
 //            return ret;
 //        });
-        (&r + &self.bias).mapv(|x| (self.activation.activation)(x))
+        let a = (&r + &self.bias);
+        let bb = a.map_axis(Axis(1), |row| (self.activation.activation)(row.to_owned()));
+        let z = Self::to_array2(bb);
+        self.z = z.clone();
+        z
     }
-    pub fn back_propagation(&mut self, grad_output: &Array1<f32>) -> Array1<f32>
+    fn to_array2(nested: Array<Array1<f32>, Ix1>) -> Array2<f32> {
+        // Erstellt eine Vec von Views, da stack Referenzen benötigt
+        let views: Vec<_> = nested.iter().map(|a| a.view()).collect();
+        // Stapelt die 1D-Arrays entlang Axis(0), um Zeilen einer 2D-Matrix zu bilden
+        stack(Axis(0), &views)
+            .expect("Arrays must have the same length to stack into a matrix")
+    }
+
+    pub fn back_prop3(&mut self, dL_dact: &Array2<f32>)
     {
-        let dact_dz = grad_output.mapv(|x|(self.activation.derivative_activation)(x));
-        let dz_dw:Array2<f32> = &dact_dz * &self.input;
-        let dz_db = &dact_dz;
-        let dz_dactPrevious = self.weights.clone();
-        self.weights = &self.weights - dz_dw;
-        self.bias = &self.bias - dz_db;
+        let dact_dz = self.z.map_axis(Axis(1), |x| {
+            (&self.activation.derivative_activation)(x.to_owned())
+        });
+        let dact_dz = Self::to_array2(dact_dz);
+        println!();
+        println!();
+        println!();
+        println!();
 
-        dact_dz.dot(&dz_dactPrevious)
+        let dz_db = 1.;
+        //let w_delta = (dL_dact * &dact_dz * dz_dw);
+
+        let delta = dL_dact * &dact_dz;                          // (batch, n_out)
+        let b_delta = delta.mean_axis(Axis(0)).unwrap() * dz_db;          // (n_out,)
+        let w_delta = delta.t().dot(&self.input) / (delta.nrows() as f32);   // (n_out, n_in)
+        self.bias = &self.bias - b_delta;
+        println!("{:#?}", delta);
+        println!("{:#?}", delta.nrows());
+        self.weights = &self.weights - w_delta;
     }
-}
-#[allow(non_snake_case)]
-pub fn ReLU(x: f32) -> f32{
-    x.max(0.0)
+
+    pub fn back_prop2(&mut self, grad_output: &Array2<f32>) -> Array2<f32>
+    {
+        //dL/da2
+
+        let dact_dz = grad_output.map_axis(Axis(0), |x| {
+            (self.activation.activation)(x.to_owned())
+        } );
+        let dact_dz = Self::to_array2(dact_dz);
+//        let dact_dz: Array1<f32> = grad_output.mapv(|x|(self.activation.derivative_activation)(x));
+        let dz_dw = &self.input.map_axis(Axis(1), |x| x.sum());
+
+        println!("{:#?}", dz_dw.shape());
+        let dz_db = 1.;
+        let new_w = ALPHA * grad_output * &dact_dz * dz_dw;
+        let new_b = (ALPHA * grad_output * &dact_dz * dz_db).map_axis(Axis(1), |x| x.sum());
+
+        let weights = self.weights.clone();
+
+        println!("{:#?}", self.bias.shape());
+        println!("{:#?}", new_b.shape());
+
+        self.bias = &self.bias - new_b;
+        self.weights = &self.weights - new_w;
+        weights
+    }
+//    pub fn back_propagation(&mut self, grad_output: &Array1<f32>) -> Array1<f32>
+//    {
+//        let dact_dz: Array1<f32> = grad_output.mapv(|x|(self.activation.derivative_activation)(x));
+//        let dz_dw = &dact_dz.dot(&self.input);
+//        let dz_db = &dact_dz;
+//        let dz_dactPrevious = self.weights.clone();
+//        self.weights = &self.weights - dz_dw;
+//        self.bias = &self.bias - dz_db;
+//
+//        dact_dz.dot(&dz_dactPrevious.t())
+//    }
 }
 
-pub fn empty_activation(x: f32) -> f32
-{
-    x
-}
 #[cfg(test)]
 mod tests {
     use super::*;

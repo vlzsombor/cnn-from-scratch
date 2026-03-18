@@ -1,3 +1,3 @@
 ﻿pub mod layer;
-mod node_container;
-mod loss_functions;
+pub mod LayerContainer;
+pub mod loss_functions;
