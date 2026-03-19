@@ -4,51 +4,49 @@ use std::io::{BufRead, BufReader};
 use crate::input_transform::{normalize_image_pixels_vec, process_csv};
 use crate::train::LayerContainer::{loss, loss_derivate, LayerContainer};
 use ndarray::{array, Array, Array1, Array2, Axis};
+use ndarray_rand::RandomExt;
+use rand_distr::StandardNormal;
 use crate::train::layer::{Activation, Layer};
 
 mod input_transform;
 pub mod train;
 
 const U8_UPPER: u32 = 255;
-
+fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
+    let x: Array2<f32> = Array2::random((n_samples, 2), StandardNormal) * 2. + 10.;
+   // let y: Array1<f32> = 2.0 * &x.column(0) + 3.0 * &x.column(1) - 1.0;
+    let y: Array1<f32> = x.column(0).to_owned() + x.column(0).to_owned();
+    (x, y.insert_axis(Axis(1))
+        .to_owned())
+}
 fn main() {
-//    let r = process_csv("src/data/mnist_train_small.csv").unwrap();
-//    let normalized = normalize_image_pixels_vec(&r, U8_UPPER);
-
-//    let r = load_iris("src/data/Iris.csv").unwrap();
-//    let b = train(&r);
-
-
-
-
-
-    let layers = vec![
-        Layer::new(2,2, Some(Activation::Relu()),None),
-        //            Layer::new(2,1, Some(Activation::Relu()),None),
+    let layers: Vec<Layer> = vec![
+        Layer::new(2,64, Some(Activation::Relu()),None),
+        Layer::new(64,1, Some(Activation::Relu()),None),
     ];
     let mut sut = LayerContainer::new_layers(layers);
-    let input = array![[1.,1.], [5.,5.]];
-    let y = array![[1.,3.], [8.,6.],[48.,11.], [224.,19.]];
-    let y = array![[2.,2.], [5., 5.]];
 
-    let mut y_hat = sut.forward(&input);
-    //        let loss: Array2<f32> = 1./(y_hat.nrows() as f32) * (y_hat - y);
+    let (X, y) = generate_linear_dataset(1000);
+
+    dbg!(&X);
+    let mut y_hat = sut.forward(&X);
     let l1 = loss(&y_hat, &y);
-    for _ in 0..10{
-        y_hat = sut.forward(&input);
+    for i in 0..1500{
+        y_hat = sut.forward(&X);
         sut.backward_hard_coded(&loss_derivate(&y_hat, &y));
+        if(i % 50 == 0){
+            let l = loss(&y_hat, &y);
+            dbg!(l);
+        }
     }
     let l2 = loss(&y_hat, &y);
-    dbg!(l1);
+
+    let xp = array![[10.,10.2], [10., 10.3], [10.,9.9], [10.,9.8], [11.,9.5], [10.2,10.8], [10.,9.], [10.5,9.5]];
+    let predict1 = sut.forward(&xp);
+    dbg!(&xp);
+    dbg!(&predict1);
     dbg!(l2);
-
-
-
-
     return;
-
-
-    let epsilon = 1e-5;
 
 
 

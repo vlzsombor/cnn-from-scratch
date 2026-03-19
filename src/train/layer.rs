@@ -23,7 +23,7 @@ pub struct Activation{
     activation: fn(Array1<f32>) -> Array1<f32>,
     derivative_activation: fn(Array1<f32>) -> Array1<f32>,
 }
-pub const ALPHA: f32 = 0.0001;
+pub const ALPHA: f32 = 0.001;
 impl Activation {
     pub fn Empty() -> Self{
         Activation{
@@ -125,26 +125,26 @@ impl Layer {
         stack(Axis(0), &views)
             .expect("Arrays must have the same length to stack into a matrix")
     }
-
-    pub fn back_prop3(&mut self, dL_dact: &Array2<f32>)
+    /// dL_dact: (batch, n_out)
+    pub fn back_prop3(&mut self, dL_dact: &Array2<f32>) -> Array2<f32>
     {
         let dact_dz = self.z.map_axis(Axis(1), |x| {
             (&self.activation.derivative_activation)(x.to_owned())
         });
+//        dbg!(&dact_dz);
         let dact_dz = Self::to_array2(dact_dz);
         let dz_db = 1.;
 
         let delta = dL_dact * &dact_dz;                          // (batch, n_out)
         let b_delta = delta.mean_axis(Axis(0)).unwrap() * dz_db;          // (n_out,)
         let w_delta = delta.t().dot(&self.input) / (delta.ncols() as f32);   // (n_out, n_in)
+        let dz_da_1 = self.weights.clone();
         self.bias = &self.bias - ALPHA * b_delta;
-//        println!();
-//        println!("{:#?}", self.weights);
+        self.weights = &self.weights - ALPHA * w_delta.t().to_owned();
 
-//        dbg!(&w_delta);
-//        dbg!(&self.weights);
-        self.weights = &self.weights - ALPHA * w_delta.to_owned();
-//        dbg!(&self.weights);
+        let dL_da_prev = delta.dot(&dz_da_1.t());  // (batch, n_in)
+//        dbg!(&dL_da_prev);
+        dL_da_prev
     }
 
     pub fn back_prop2(&mut self, grad_output: &Array2<f32>) -> Array2<f32>

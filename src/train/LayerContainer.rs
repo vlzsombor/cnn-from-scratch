@@ -53,11 +53,15 @@ Output layer: 1 neuron with ReLU
 Loss: MSE
 Full dataset is 4 samples — use all 4 as one batch every forward pass
  */
-    pub fn backward_hard_coded(&mut self, loss: &Array2<f32>){
-//        let a1 = col - &y;
-// y_hat - y
-        for l in self.layers.iter_mut().rev(){
-            l.back_prop3(loss);
+    pub fn backward_hard_coded(&mut self, loss: &Array2<f32>) {
+        let mut delta: Option<Array2<f32>> = None;
+
+        for l in self.layers.iter_mut().rev() {
+            let input_grad = match &delta {
+                None        => l.back_prop3(loss),
+                Some(d)     => l.back_prop3(d),
+            };
+            delta = Some(input_grad);
         }
     }
     pub fn backward2(&mut self, input: Array2<f32>)
@@ -69,15 +73,6 @@ Full dataset is 4 samples — use all 4 as one batch every forward pass
         }
         todo!()
     }
-    //3 2 2
-//    pub fn backward(&mut self, X: Array1<f32>) {
-//        self.layers
-//            .iter_mut()
-//            .rev()
-//            .fold(X, |acc, layer| {
-//                layer.back_propagation(&acc)
-//            });
-//    }
 }
 
 
@@ -96,15 +91,37 @@ mod tests {
     use crate::train::layer::{Activation, Layer};
 
     #[test]
-    pub fn Backprop(){
-        let layers = vec![
-            Layer::new(2,2, Some(Activation::Relu()),None),
-            //            Layer::new(2,1, Some(Activation::Relu()),None),
+    pub fn multi_layer(){
+        let layers: Vec<Layer> = vec![
+            Layer::new(2,4, Some(Activation::Relu()),None),
+            Layer::new(4,4, Some(Activation::Relu()),None),
+            Layer::new(4,2, Some(Activation::Relu()),None),
         ];
         let mut sut = LayerContainer::new_layers(layers);
-        let input = array![[1.,1.], [5.,5.]];
-        let y = array![[1.,3.], [8.,6.],[48.,11.], [224.,19.]];
-        let y = array![[2.,2.], [5., 5.]];
+        let input = array![[1., 1.], [5.,5.], [7.,7.], [10., 10.], [12., 12.]];
+        let y = array![[2., 2.], [10., 10.], [14., 14.], [20.,20.], [24., 24.]];
+
+        let mut y_hat = sut.forward(&input);
+        let l1 = loss(&y_hat, &y);
+        for _ in 0..10000{
+            y_hat = sut.forward(&input);
+            sut.backward_hard_coded(&loss_derivate(&y_hat, &y));
+        }
+        let l2 = loss(&y_hat, &y);
+        dbg!(l1);
+        dbg!(l2);
+        assert!(l1 > l2);
+        assert!(l1 - l2 > 100.);
+    }
+    #[test]
+    pub fn test_backprop_decrease_loss2(){
+        let layers: Vec<Layer> = vec![
+            Layer::new(1,2, Some(Activation::Relu()),None),
+            Layer::new(2,1, Some(Activation::Relu()),None),
+        ];
+        let mut sut = LayerContainer::new_layers(layers);
+        let input = array![[1.], [5.,]];
+        let y = array![[2.], [10.]];
 
         let mut y_hat = sut.forward(&input);
         //        let loss: Array2<f32> = 1./(y_hat.nrows() as f32) * (y_hat - y);
@@ -117,9 +134,28 @@ mod tests {
         dbg!(l1);
         dbg!(l2);
         assert!(l1 > l2);
+    }
+    #[test]
+    pub fn test_backprop_decrease_loss(){
+        let layers = vec![
+            Layer::new(2,2, Some(Activation::Relu()),None),
+            //            Layer::new(2,1, Some(Activation::Relu()),None),
+        ];
+        let mut sut = LayerContainer::new_layers(layers);
+        let input = array![[1.,1.], [5.,5.]];
+        let y = array![[2.,2.], [10., 10.]];
 
-
-
+        let mut y_hat = sut.forward(&input);
+        //        let loss: Array2<f32> = 1./(y_hat.nrows() as f32) * (y_hat - y);
+        let l1 = loss(&y_hat, &y);
+        for _ in 0..100{
+            y_hat = sut.forward(&input);
+            sut.backward_hard_coded(&loss_derivate(&y_hat, &y));
+        }
+        let l2 = loss(&y_hat, &y);
+        dbg!(l1);
+        dbg!(l2);
+        assert!(l1 > l2);
     }
     #[test]
     pub fn test1()
