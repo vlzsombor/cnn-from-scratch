@@ -1,10 +1,12 @@
 ﻿ pub(crate) use crate::train::activation::{Activation, ALPHA};
 use ndarray::linalg::Dot;
 use ndarray::{stack, Array, Array1, Array2, Axis, Ix1};
-use ndarray_rand::rand_distr::StandardNormal;
+ use ndarray_rand::rand::SeedableRng;
+ use ndarray_rand::rand_distr::StandardNormal;
 use ndarray_rand::RandomExt;
+ use rand_chacha::ChaCha8Rng;
 
-#[derive(Debug)]
+ #[derive(Debug)]
 pub struct Layer
 {
 //    number_of_inputs: u32,
@@ -17,7 +19,33 @@ pub struct Layer
 }
 
 impl Layer {
-    pub fn new(number_of_inputs: u32, number_of_nodes: u32, activation: Option<Activation>, state: Option<u64>) -> Layer {
+
+    pub fn new_deterministic(number_of_inputs: u32, number_of_nodes: u32, activation: Option<Activation>, state: Option<u64>) -> Layer {
+        let activation = activation.unwrap_or(Activation::empty());
+
+        let mut rng = ChaCha8Rng::seed_from_u64(state.unwrap_or(42));
+        let weights = Array2::random_using(
+            (number_of_inputs as usize, number_of_nodes as usize),
+            StandardNormal,
+            &mut rng
+        );
+        //        let bias: f32 = rng.random();
+        let bias: Array1<f32> =  Array1::random_using(
+            number_of_nodes as usize,
+            StandardNormal,
+            &mut rng
+        );
+        Layer {
+            //            number_of_inputs,
+            //            number_of_nodes,
+            activation,
+            weights,
+            bias,
+            input: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize)),
+            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
+        }
+    }
+    pub fn new(number_of_inputs: u32, number_of_nodes: u32, activation: Option<Activation>) -> Layer {
         let activation = activation.unwrap_or(Activation::empty());
 
 //        let mut rng = ChaCha8Rng::seed_from_u64(state); // fixed seed
@@ -89,18 +117,18 @@ mod tests {
 
     #[test]
     fn test_neural_layer_seeded_reproducible() {
-        let layer1 = Layer::new(3, 4, Some(Activation::relu()), Some(42));
+        let layer1 = Layer::new(3, 4, Some(Activation::relu()));
         assert_eq!(layer1.weights.shape(), &[3, 4]);
-        let mut nnlayer1 = Layer::new(2, 2, Some(Activation::relu()), Some(42));
+        let mut nnlayer1 = Layer::new_deterministic(2, 2, Some(Activation::relu()), None);
         let input: Array2<f32> = Array2::from(vec![[4.0, 2.0], [3.0, 2.0]]);
         let res = nnlayer1.forward(&input);
-        let expected :Array2<f32>= array! [[2.2273476, 7.026132], [1.7493664, 5.6920614]];
+        let expected :Array2<f32>= array! [[0.97810096, 5.3549976], [0.50011975, 4.020927]];
         assert_abs_diff_eq!(&res, &expected, epsilon = 1e-4);
     }
 
     #[test]
     fn test_layer_stats_normal() {
-        let layer = Layer::new(100, 50, Some(Activation::relu()), Some(42));
+        let layer = Layer::new(100, 50, Some(Activation::relu()));
         let mean = layer.weights.mean().unwrap();
         let std = layer.weights.std(0.); // population std
 

@@ -10,6 +10,16 @@ use std::io::{BufRead, BufReader};
 mod input_transform;
 pub mod train;
 
+fn generate_xor_dataset() -> (Array2<f32>, Array2<f32>) {
+    let x: Array2<f32> = array![[0.,0.],
+                                [0.,1.],
+                                [1.,0.],
+                                [1.,1.],
+    ];
+    // let y: Array1<f32> = 2.0 * &x.column(0) + 3.0 * &x.column(1) - 1.0;
+    let y = array![[0.], [1.], [1.],[0.]];
+    (x, y)
+}
 fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
     let x: Array2<f32> = Array2::random((n_samples, 2), StandardNormal) * 2. + 10.;
    // let y: Array1<f32> = 2.0 * &x.column(0) + 3.0 * &x.column(1) - 1.0;
@@ -19,19 +29,18 @@ fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
 }
 fn main() {
     let layers: Vec<Layer> = vec![
-        Layer::new(2, 64, Some(Activation::relu()), None),
-        Layer::new(64, 1, Some(Activation::relu()), None),
+        Layer::new(2, 64, Some(Activation::relu())),
+        Layer::new(64, 1, Some(Activation::relu())),
     ];
     let mut sut = LayerContainer::new_layers(layers);
 
-    let (X, y) = generate_linear_dataset(1000);
+    let (X, y) = generate_xor_dataset();
 
-    dbg!(&X);
     let mut y_hat = sut.forward(&X);
     let l1 = loss(&y_hat, &y);
-    for i in 0..1500{
+    for i in 0..12500{
         y_hat = sut.forward(&X);
-        sut.backward_hard_coded(&loss_derivate(&y_hat, &y));
+        sut.backward_propagation(&loss_derivate(&y_hat, &y));
         if i % 50 == 0 {
             let l = loss(&y_hat, &y);
             dbg!(l);
@@ -39,7 +48,7 @@ fn main() {
     }
     let l2 = loss(&y_hat, &y);
 
-    let xp = array![[10.,10.2], [10., 10.3], [10.,9.9], [10.,9.8], [11.,9.5], [10.2,10.8], [10.,9.], [10.5,9.5]];
+    let xp = array![[0.,0.], [0., 1.], [1.,0.], [1.,1.]];
     let predict1 = sut.forward(&xp);
     dbg!(&xp);
     dbg!(&predict1);
