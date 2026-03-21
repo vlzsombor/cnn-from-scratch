@@ -1,5 +1,4 @@
-﻿use ndarray::linalg::Dot;
-use ndarray::Array1;
+﻿use ndarray::Array1;
 
 pub const EPSILON: f32 = 1.0E-6;//0.0001;
 

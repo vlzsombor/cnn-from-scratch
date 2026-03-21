@@ -1,3 +1,4 @@
 ﻿pub mod layer;
-pub mod LayerContainer;
+pub mod layer_container;
 pub mod loss_functions;
+pub mod activation;

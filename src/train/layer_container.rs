@@ -1,5 +1,5 @@
 ﻿use crate::train::layer::{Activation, Layer};
-use ndarray::{Array1, Array2};
+use ndarray::Array2;
 
 #[derive(Debug)]
 pub struct LayerContainer {
@@ -10,8 +10,8 @@ impl LayerContainer {
 
     pub fn new_def() -> Self {
         let layers = vec![
-            Layer::new(2,2, Some(Activation::Relu()),None),
-            Layer::new(2,1, Some(Activation::Relu()),None)
+            Layer::new(2, 2, Some(Activation::relu()), None),
+            Layer::new(2, 1, Some(Activation::relu()), None)
         ];
         LayerContainer {
             layers
@@ -25,7 +25,7 @@ impl LayerContainer {
     }
     pub fn new(layer_number: Vec<[u32; 2]>) -> Self {
         let layers: Vec<Layer> = layer_number.iter().map(|x|{
-            Layer::new(x[0],x[1], Some(Activation::Relu()), None)
+            Layer::new(x[0], x[1], Some(Activation::relu()), None)
         }).collect();
         LayerContainer {
             layers
@@ -39,20 +39,6 @@ impl LayerContainer {
                 layer.forward(&acc)
             })
     }
-/*
-Task:
-Given two binary inputs, predict their XOR output.
-[0,0] → 0
-[0,1] → 1
-[1,0] → 1
-[1,1] → 0
-Network requirements:
-Input layer: 2 neurons
-Hidden layer: ≥2 neurons with ReLU (4 is safe)
-Output layer: 1 neuron with ReLU
-Loss: MSE
-Full dataset is 4 samples — use all 4 as one batch every forward pass
- */
     pub fn backward_hard_coded(&mut self, loss: &Array2<f32>) {
         let mut delta: Option<Array2<f32>> = None;
 
@@ -63,15 +49,6 @@ Full dataset is 4 samples — use all 4 as one batch every forward pass
             };
             delta = Some(input_grad);
         }
-    }
-    pub fn backward2(&mut self, input: Array2<f32>)
-    {
-        for l in self.layers.iter_mut().rev()
-        {
-            let a = l.back_prop2(&input);
-            let a = l.back_prop2(&input);
-        }
-        todo!()
     }
 }
 
@@ -85,17 +62,17 @@ pub fn loss_derivate(y_hat: &Array2<f32>, y: &Array2<f32>) -> Array2<f32> {
 }
 #[cfg(test)]
 mod tests {
-    use crate::train::LayerContainer::{loss, loss_derivate, LayerContainer};
+    use crate::train::layer::{Activation, Layer};
+    use crate::train::layer_container::{loss, loss_derivate, LayerContainer};
     use approx::assert_abs_diff_eq;
     use ndarray::{array, Array2, ArrayBase, Ix2, OwnedRepr};
-    use crate::train::layer::{Activation, Layer};
 
     #[test]
     pub fn multi_layer(){
         let layers: Vec<Layer> = vec![
-            Layer::new(2,4, Some(Activation::Relu()),None),
-            Layer::new(4,4, Some(Activation::Relu()),None),
-            Layer::new(4,2, Some(Activation::Relu()),None),
+            Layer::new(2, 4, Some(Activation::relu()), None),
+            Layer::new(4, 4, Some(Activation::relu()), None),
+            Layer::new(4, 2, Some(Activation::relu()), None),
         ];
         let mut sut = LayerContainer::new_layers(layers);
         let input = array![[1., 1.], [5.,5.], [7.,7.], [10., 10.], [12., 12.]];
@@ -116,8 +93,8 @@ mod tests {
     #[test]
     pub fn test_backprop_decrease_loss2(){
         let layers: Vec<Layer> = vec![
-            Layer::new(1,2, Some(Activation::Relu()),None),
-            Layer::new(2,1, Some(Activation::Relu()),None),
+            Layer::new(1, 2, Some(Activation::relu()), None),
+            Layer::new(2, 1, Some(Activation::relu()), None),
         ];
         let mut sut = LayerContainer::new_layers(layers);
         let input = array![[1.], [5.,]];
@@ -138,7 +115,7 @@ mod tests {
     #[test]
     pub fn test_backprop_decrease_loss(){
         let layers = vec![
-            Layer::new(2,2, Some(Activation::Relu()),None),
+            Layer::new(2, 2, Some(Activation::relu()), None),
             //            Layer::new(2,1, Some(Activation::Relu()),None),
         ];
         let mut sut = LayerContainer::new_layers(layers);
