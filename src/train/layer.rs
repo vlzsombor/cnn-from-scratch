@@ -12,12 +12,18 @@ pub struct Layer
 //    number_of_inputs: u32,
 //    number_of_nodes: u32,
     activation: Activation,
+    /// e { features layer X features layer-1}
     weights: Array2<f32>,
+    /// e { features X 1 }
     bias: Array1<f32>,
+    /// raw input from the previous layer
+    /// input e { batch X features }
     input: Array2<f32>,
+    /// node output without activation layer
+    /// z e { batch X features }
     z: Array2<f32>
 }
-
+// matrix_name e (is element of) {rows_number X column_number}
 impl Layer {
 
     pub fn new_deterministic(number_of_inputs: u32, number_of_nodes: u32, activation: Option<Activation>, state: Option<u64>) -> Layer {
@@ -81,31 +87,76 @@ impl Layer {
         self.z = z.clone();
         z
     }
+    /// dC_da e { b x f }
+    pub fn backward_propagation(&mut self, dC_da : &Array2<f32>) -> Array2<f32>
+    {
+        // e { b X f }
+        let da_dz = (self.activation.derivative_activation)(self.z.view());
+        // e { b X f }
+        let delta = dC_da * da_dz;
+        let dz_db = 1.;
+        let dz_dw = &self.input;
+
+        // e { i X f }
+        let dz_dal_1 = self.weights.clone();
+        let b_update = (&delta * dz_db).sum_axis(Axis(0));
+        self.bias = &self.bias - ALPHA * b_update;
+        let w_update = &self.input.t().dot(&delta);
+        self.weights = &self.weights - ALPHA * w_update;
+
+//        dbg!(delta.shape(), dz_dal_1.shape());
+        // e { b X i }
+        let r = delta.dot(&dz_dal_1.t());
+//        dbg!(&r.shape());
+        r
+    }
+
     fn to_array2(nested: Array<Array1<f32>, Ix1>) -> Array2<f32> {
-        // Erstellt eine Vec von Views, da stack Referenzen benötigt
         let views: Vec<_> = nested.iter().map(|a| a.view()).collect();
-        // Stapelt die 1D-Arrays entlang Axis(0), um Zeilen einer 2D-Matrix zu bilden
         stack(Axis(0), &views)
             .expect("Arrays must have the same length to stack into a matrix")
     }
-    /// dL_dact: (batch, n_out)
-    pub fn back_prop3(&mut self, dL_dact: &Array2<f32>) -> Array2<f32>
-    {
-        let dact_dz = self.z.map_axis(Axis(1), |x| {
-            (&self.activation.derivative_activation)(x.to_owned())
-        });
-        let dact_dz = Self::to_array2(dact_dz);
-        let dz_db = 1.;
 
-        let delta = dL_dact * &dact_dz;                          // (batch, n_out)
-        let b_delta = delta.mean_axis(Axis(0)).unwrap() * dz_db;          // (n_out,)
-        let w_delta = delta.t().dot(&self.input) / (delta.ncols() as f32);   // (n_out, n_in)
-        let dz_da_1 = self.weights.clone();
-        self.bias = &self.bias - ALPHA * b_delta;
-        self.weights = &self.weights - ALPHA * w_delta.t().to_owned();
-        let dL_da_prev = delta.dot(&dz_da_1.t());  // (batch, n_in)
-        dL_da_prev
-    }
+
+
+
+    //    /// dL_da: e {batch X features}
+    //    pub fn backward_propagation(&mut self, dL_da :Array2<f32>)
+    //    {
+    //        // dz_da e { batch X features }
+    //        let dz_da = (self.activation.derivative_activation)(self.z.view());
+    //        // dz_da e { batch X features }
+    //        let delta = dL_da * dz_da;
+    //        // dz_da e { batch X features_layer_-1 }
+    //        let dz_dw = &self.input;
+    //        let dz_db = 1.;
+    //        // w_update e { batch X features-1 }
+    //        let w_update = &delta * dz_dw;
+    //        // e { batch X features }
+    //        let partial_derivative = &delta * dz_db;
+    //        let b_update = partial_derivative.mean_axis(Axis(0)).unwrap();
+    //
+    //        self.bias = &self.bias - b_update;
+    //
+    //    }
+
+    //    pub fn backward_propagation(&mut self, dL_dact: &Array2<f32>) -> Array2<f32>
+//    {
+//        let dact_dz = self.z.map_axis(Axis(1), |x| {
+//            (&self.activation.derivative_activation)(x.to_owned())
+//        });
+//        let dact_dz = Self::to_array2(dact_dz);
+//        let dz_db = 1.;
+//
+//        let delta = dL_dact * &dact_dz;                          // (batch, n_out)
+//        let b_delta = delta.mean_axis(Axis(0)).unwrap() * dz_db;          // (n_out,)
+//        let w_delta = delta.t().dot(&self.input) / (delta.ncols() as f32);   // (n_out, n_in)
+//        let dz_da_1 = self.weights.clone();
+//        self.bias = &self.bias - ALPHA * b_delta;
+//        self.weights = &self.weights - ALPHA * w_delta.t().to_owned();
+//        let dL_da_prev = delta.dot(&dz_da_1.t());  // (batch, n_in)
+//        dL_da_prev
+//    }
 
 }
 

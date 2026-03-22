@@ -40,7 +40,7 @@ fn main() {
     let l1 = loss(&y_hat, &y);
     for i in 0..12500{
         y_hat = sut.forward(&X);
-        sut.backward_propagation(&loss_derivate(&y_hat, &y));
+        sut.backward_propagation(loss_derivate(&y_hat, &y));
         if i % 50 == 0 {
             let l = loss(&y_hat, &y);
             dbg!(l);
