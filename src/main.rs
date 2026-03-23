@@ -32,25 +32,22 @@ fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
 
 
 pub fn debug_array(a: &Array2<f32>) {
-    let rounded: Vec<Vec<String>> = a.rows().into_iter()
-        .map(|row| row.iter().map(|x| format!("{:.3}", x)).collect())
+    let rows: Vec<String> = a.rows().into_iter()
+        .map(|row| {
+            let vals: Vec<String> = row.iter().map(|x| format!("{:.3}", x)).collect();
+            format!("[{}]", vals.join(", "))
+        })
         .collect();
-    dbg!(rounded);
+    println!("[{}]", rows.join(", "));
 }
-fn main() {
-    let layers: Vec<Layer> = vec![
-        Layer::new(2, 64, Some(Activation::relu())),
-        Layer::new(64, 64, Some(Activation::relu())),
-        Layer::new(64, 2, None),
-    ];
 
+fn main() {
     let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-        Box::new(Layer::new(2, 64, Some(Activation::relu()))),
-        Box::new(ActivationLayer::new_relu()),
-        Box::new(Layer::new(64, 64, Some(Activation::relu()))),
-        Box::new(ActivationLayer::new_relu()),
-        Box::new(Layer::new(64, 2, Some(Activation::relu()))),
-        Box::new(ActivationLayer::new_empty()),
+        Box::new(Layer::new(2, 64)),
+        Box::new(ActivationLayer::relu()),
+        Box::new(Layer::new(64, 64)),
+        Box::new(ActivationLayer::relu()),
+        Box::new(Layer::new(64, 2)),
     ];
     let mut sut = LayerContainer::new_layers_boxed(layers);
 

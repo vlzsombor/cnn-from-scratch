@@ -11,8 +11,8 @@ impl LayerContainer {
 
     pub fn new_def() -> Self {
         let layers: Vec<Box<dyn Layerable>> = vec![
-            Box::new(Layer::new(2, 2, Some(Activation::relu()))),
-            Box::new(Layer::new(2, 1, Some(Activation::relu())))
+            Box::new(Layer::new(2, 2)),
+            Box::new(Layer::new(2, 1))
         ];
 
         LayerContainer {
@@ -33,7 +33,7 @@ impl LayerContainer {
 
     pub fn new(layer_number: Vec<[u32; 2]>) -> Self {
         let layers: Vec<Layer> = layer_number.iter().map(|x|{
-            Layer::new(x[0], x[1], Some(Activation::relu()))
+            Layer::new(x[0], x[1])
         }).collect();
         LayerContainer {
             layers: layers.into_iter().map(|l| Box::new(l) as Box<dyn Layerable>).collect()
@@ -67,19 +67,20 @@ pub fn loss_derivate(y_hat: &Array2<f32>, y: &Array2<f32>) -> Array2<f32> {
 }
 #[cfg(test)]
 mod tests {
-    use crate::train::layer::{Activation, Layer};
+    use crate::train::layer::{Activation, ActivationLayer, Layer};
     use crate::train::layer_container::{loss, loss_derivate, LayerContainer};
     use approx::assert_abs_diff_eq;
     use ndarray::{array, Array2, ArrayBase, Ix2, OwnedRepr};
+    use crate::train::layerable::Layerable;
 
     #[test]
     pub fn multi_layer(){
-        let layers: Vec<Layer> = vec![
-            Layer::new(2, 4, Some(Activation::relu())),
-            Layer::new(4, 64, Some(Activation::relu())),
-            Layer::new(64, 2, None),
+        let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
+            Box::new(Layer::new(2, 4)),
+            Box::new(ActivationLayer::relu()),
+            Box::new(Layer::new(4, 2)),
         ];
-        let mut sut = LayerContainer::new_layers(layers);
+        let mut sut = LayerContainer::new_layers_boxed(layers);
         let input = array![[1., 1.], [5.,5.], [7.,7.], [10., 10.], [12., 12.]];
         let y = array![[2., 2.], [10., 10.], [14., 14.], [20.,20.], [24., 24.]];
 
@@ -96,11 +97,12 @@ mod tests {
     }
     #[test]
     pub fn test_backprop_decrease_loss2(){
-        let layers: Vec<Layer> = vec![
-            Layer::new(1, 2, Some(Activation::relu())),
-            Layer::new(2, 1, None),
+        let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
+            Box::new(Layer::new(1, 2)),
+            Box::new(ActivationLayer::relu()),
+            Box::new(Layer::new(2, 1)),
         ];
-        let mut sut = LayerContainer::new_layers(layers);
+        let mut sut = LayerContainer::new_layers_boxed(layers);
         let input = array![[1.], [5.,]];
         let y = array![[2.], [10.]];
 
@@ -118,11 +120,10 @@ mod tests {
     }
     #[test]
     pub fn test_backprop_decrease_loss(){
-        let layers = vec![
-            Layer::new(2, 2, Some(Activation::relu())),
-            //            Layer::new(2,1, Some(Activation::Relu()),None),
+        let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
+            Box::new(Layer::new(2, 2)),
         ];
-        let mut sut = LayerContainer::new_layers(layers);
+        let mut sut = LayerContainer::new_layers_boxed(layers);
         let input = array![[1.,1.], [5.,5.]];
         let y = array![[2.,2.], [10., 10.]];
 
@@ -143,10 +144,15 @@ mod tests {
     {
         let layer_number = vec![[3,2],[2,1]];
 
-        let layers: Vec<Layer> = layer_number.iter().map(|x|{
-            Layer::new_deterministic(x[0], x[1], Some(Activation::relu()), None)
-        }).collect();
-        let mut sut = LayerContainer::new_layers(layers);
+
+        let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
+            Box::new(Layer::new_deterministic(3, 2, None)),
+            Box::new(ActivationLayer::relu()),
+            Box::new(Layer::new_deterministic(2, 1, None)),
+            Box::new(ActivationLayer::relu()),
+        ];
+
+        let mut sut = LayerContainer::new_layers_boxed(layers);
         let input: Array2<f32> = Array2::from(vec![[1.,2.,3.], [5.,6.,7.], [9.,10.,11.], [20.,300.,200000.]]);
         let input: Array2<f32> = Array2::from(vec![
             [10.,0., 10.],

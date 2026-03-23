@@ -42,17 +42,14 @@ impl Layerable for ActivationLayer
 }
 impl ActivationLayer
 {
-    pub fn new_relu() -> Self
+    pub fn relu() -> Self
     {
-        ActivationLayer{
-            activation: Activation::relu(),
-            z: Default::default(),
-        }
+        Self::new(Activation::relu())
     }
-    pub fn new_empty() -> Self
+    pub fn new(activation: Activation) -> Self
     {
         ActivationLayer{
-            activation: Activation::empty(),
+            activation,
             z: Default::default(),
         }
     }
@@ -95,9 +92,7 @@ impl Layer {
     pub fn get_shape(&self) -> &[usize] {
         self.weights.shape()
     }
-    pub fn new_deterministic(number_of_inputs: u32, number_of_nodes: u32, activation: Option<Activation>, state: Option<u64>) -> Layer {
-        let activation = activation.unwrap_or(Activation::empty());
-
+    pub fn new_deterministic(number_of_inputs: u32, number_of_nodes: u32, state: Option<u64>) -> Layer {
         let mut rng = ChaCha8Rng::seed_from_u64(state.unwrap_or(42));
         let weights = Array2::random_using(
             (number_of_inputs as usize, number_of_nodes as usize),
@@ -120,9 +115,7 @@ impl Layer {
 //            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
         }
     }
-    pub fn new(number_of_inputs: u32, number_of_nodes: u32, activation: Option<Activation>) -> Layer {
-        let activation = activation.unwrap_or(Activation::empty());
-
+    pub fn new(number_of_inputs: u32, number_of_nodes: u32) -> Layer {
 //        let mut rng = ChaCha8Rng::seed_from_u64(state); // fixed seed
         let weights = Array2::random(
             (number_of_inputs as usize, number_of_nodes as usize),
@@ -166,9 +159,9 @@ mod tests {
 
     #[test]
     fn test_neural_layer_seeded_reproducible() {
-        let layer1 = Layer::new(3, 4, Some(Activation::relu()));
+        let layer1 = Layer::new(3, 4);
         assert_eq!(layer1.weights.shape(), &[3, 4]);
-        let mut nnlayer1 = Layer::new_deterministic(2, 2, Some(Activation::relu()), None);
+        let mut nnlayer1 = Layer::new_deterministic(2, 2, None);
         let input: Array2<f32> = Array2::from(vec![[4.0, 2.0], [3.0, 2.0]]);
         let res = nnlayer1.forward(&input);
         let expected :Array2<f32>= array! [[0.97810096, 5.3549976], [0.50011975, 4.020927]];
@@ -177,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_layer_stats_normal() {
-        let layer = Layer::new(100, 50, Some(Activation::relu()));
+        let layer = Layer::new(100, 50);
         let mean = layer.weights.mean().unwrap();
         let std = layer.weights.std(0.); // population std
 
