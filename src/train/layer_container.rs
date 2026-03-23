@@ -71,6 +71,7 @@ mod tests {
     use crate::train::layer_container::{loss, loss_derivate, LayerContainer};
     use approx::assert_abs_diff_eq;
     use ndarray::{array, Array2, ArrayBase, Ix2, OwnedRepr};
+    use crate::{debug_array, generate_xor_dataset};
     use crate::train::layerable::Layerable;
 
     #[test]
@@ -137,6 +138,37 @@ mod tests {
         let l2 = loss(&y_hat, &y);
         dbg!(l1);
         dbg!(l2);
+        assert!(l1 > l2);
+    }
+    #[test]
+    pub fn xor()
+    {
+        let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
+            Box::new(Layer::new(2, 64)),
+            Box::new(ActivationLayer::relu()),
+            Box::new(Layer::new(64, 64)),
+            Box::new(ActivationLayer::relu()),
+            Box::new(Layer::new(64, 2)),
+        ];
+        let mut sut = LayerContainer::new_layers_boxed(layers);
+
+        let (X, y) = generate_xor_dataset();
+
+        let mut y_hat = sut.forward(&X);
+        let l1 = loss(&y_hat, &y);
+        for i in 0..10000{
+            y_hat = sut.forward(&X);
+            sut.backward_propagation(loss_derivate(&y_hat, &y));
+            if i % 1000 == 0 {
+                let l = loss(&y_hat, &y);
+            }
+        }
+        let l2 = loss(&y_hat, &y);
+
+        let xp = array![[0.,0.], [0., 1.], [1.,0.], [1.,1.]];
+        let predict1 = sut.forward(&xp);
+        debug_array(&xp);
+        debug_array(&predict1);
         assert!(l1 > l2);
     }
     #[test]

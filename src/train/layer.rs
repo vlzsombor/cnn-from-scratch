@@ -42,6 +42,11 @@ impl Layerable for ActivationLayer
 }
 impl ActivationLayer
 {
+    pub fn sigmoid_with_cross_entropy_loss() -> Self
+    {
+        todo!();
+        Self::new(Activation::relu())
+    }
     pub fn relu() -> Self
     {
         Self::new(Activation::relu())

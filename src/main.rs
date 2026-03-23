@@ -2,7 +2,7 @@ extern crate core;
 
 use crate::train::layer::{Activation, ActivationLayer, Layer};
 use crate::train::layer_container::{loss, loss_derivate, LayerContainer};
-use ndarray::{array, Array1, Array2, Axis};
+use ndarray::{array, Array, Array1, Array2, Axis, Shape};
 use ndarray_rand::RandomExt;
 use rand_distr::StandardNormal;
 use std::error::Error;
@@ -42,6 +42,26 @@ pub fn debug_array(a: &Array2<f32>) {
 }
 
 fn main() {
+
+    let r = load_iris("/src/data/Iris.csv").unwrap();
+    let a = train(r);
+}
+fn train(data: &Vec<(Vec<f32>, String)>) -> Option<i32>
+{
+    let X: Vec<f32> = data.iter()
+        .map(|(x, _)| x)
+        .flatten()
+        .copied()
+        .collect();
+
+    let X: Array2<f32> = Array2::from_shape_vec((150, &X.len()/150), X).unwrap();
+    let label: Vec<f32> = data
+        .iter()
+        .map(|(_, y)| {
+            if y == "Iris-setosa" { 0. } else { 1. }
+        })
+        .collect();
+    let y :Array2<f32> = Array2::from_shape_vec((150,1), label).unwrap();
     let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
         Box::new(Layer::new(2, 64)),
         Box::new(ActivationLayer::relu()),
@@ -50,28 +70,21 @@ fn main() {
         Box::new(Layer::new(64, 2)),
     ];
     let mut sut = LayerContainer::new_layers_boxed(layers);
-
-    let (X, y) = generate_xor_dataset();
-
-    let mut y_hat = sut.forward(&X);
-    let l1 = loss(&y_hat, &y);
     for i in 0..10000{
-        y_hat = sut.forward(&X);
+        let y_hat = sut.forward(&X);
         sut.backward_propagation(loss_derivate(&y_hat, &y));
         if i % 1000 == 0 {
             let l = loss(&y_hat, &y);
-            dbg!(i, l);
+            dbg!(&l);
         }
     }
-    let l2 = loss(&y_hat, &y);
 
-    let xp = array![[0.,0.], [0., 1.], [1.,0.], [1.,1.]];
-    let predict1 = sut.forward(&xp);
-    debug_array(&xp);
-    debug_array(&predict1);
-    dbg!(l2);
+    let y_hat = sut.forward(&X);
+    let l = loss(&y_hat, &y);
+    dbg!(&l);
+
+    Some(0)
 }
-
 fn load_iris(path: &str) -> Result<Vec<(Vec<f32>, String)>, Box<dyn Error>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
