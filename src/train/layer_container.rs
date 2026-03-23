@@ -20,10 +20,14 @@ impl LayerContainer {
         }
     }
 
+    pub fn new_layers_boxed(layers: Vec<Box<dyn crate::train::layerable::Layerable>>) -> Self {
+        LayerContainer {
+            layers
+        }
+    }
     pub fn new_layers(layers: Vec<Layer>) -> Self {
         LayerContainer {
             layers: layers.into_iter().map(|l| Box::new(l) as Box<dyn Layerable>).collect()
-
         }
     }
 

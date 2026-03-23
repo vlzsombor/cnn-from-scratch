@@ -1,6 +1,6 @@
 extern crate core;
 
-use crate::train::layer::{Activation, Layer};
+use crate::train::layer::{Activation, ActivationLayer, Layer};
 use crate::train::layer_container::{loss, loss_derivate, LayerContainer};
 use ndarray::{array, Array1, Array2, Axis};
 use ndarray_rand::RandomExt;
@@ -29,13 +29,30 @@ fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
     (x, y.insert_axis(Axis(1))
         .to_owned())
 }
+
+
+pub fn debug_array(a: &Array2<f32>) {
+    let rounded: Vec<Vec<String>> = a.rows().into_iter()
+        .map(|row| row.iter().map(|x| format!("{:.3}", x)).collect())
+        .collect();
+    dbg!(rounded);
+}
 fn main() {
     let layers: Vec<Layer> = vec![
         Layer::new(2, 64, Some(Activation::relu())),
         Layer::new(64, 64, Some(Activation::relu())),
         Layer::new(64, 2, None),
     ];
-    let mut sut = LayerContainer::new_layers(layers);
+
+    let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
+        Box::new(Layer::new(2, 64, Some(Activation::relu()))),
+        Box::new(ActivationLayer::new_relu()),
+        Box::new(Layer::new(64, 64, Some(Activation::relu()))),
+        Box::new(ActivationLayer::new_relu()),
+        Box::new(Layer::new(64, 2, Some(Activation::relu()))),
+        Box::new(ActivationLayer::new_empty()),
+    ];
+    let mut sut = LayerContainer::new_layers_boxed(layers);
 
     let (X, y) = generate_xor_dataset();
 
@@ -44,7 +61,7 @@ fn main() {
     for i in 0..10000{
         y_hat = sut.forward(&X);
         sut.backward_propagation(loss_derivate(&y_hat, &y));
-        if i % 100 == 0 {
+        if i % 1000 == 0 {
             let l = loss(&y_hat, &y);
             dbg!(i, l);
         }
@@ -53,8 +70,8 @@ fn main() {
 
     let xp = array![[0.,0.], [0., 1.], [1.,0.], [1.,1.]];
     let predict1 = sut.forward(&xp);
-    dbg!(&xp);
-    dbg!(&predict1);
+    debug_array(&xp);
+    debug_array(&predict1);
     dbg!(l2);
 }
 

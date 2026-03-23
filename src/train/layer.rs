@@ -10,9 +10,6 @@ use crate::train::layerable::Layerable;
 #[derive(Debug)]
 pub struct Layer
 {
-//    number_of_inputs: u32,
-//    number_of_nodes: u32,
-    activation: Activation,
     /// e { features layer X features layer-1}
     weights: Array2<f32>,
     /// e { features X 1 }
@@ -20,9 +17,45 @@ pub struct Layer
     /// raw input from the previous layer
     /// input e { batch X features }
     input: Array2<f32>,
+}
+
+#[derive(Debug)]
+pub struct ActivationLayer
+{
+    //    number_of_inputs: u32,
+    //    number_of_nodes: u32,
+    activation: Activation,
     /// node output without activation layer
     /// z e { batch X features }
     z: Array2<f32>
+}
+impl Layerable for ActivationLayer
+{
+    fn forward(&mut self, X: &Array2<f32>) -> Array2<f32> {
+        self.z = X.clone();
+        X.mapv(&self.activation.activation)
+    }
+
+    fn backward_propagation(&mut self, dC_da: &Array2<f32>) -> Array2<f32> {
+        self.z.mapv(&self.activation.derivative_activation) * dC_da
+    }
+}
+impl ActivationLayer
+{
+    pub fn new_relu() -> Self
+    {
+        ActivationLayer{
+            activation: Activation::relu(),
+            z: Default::default(),
+        }
+    }
+    pub fn new_empty() -> Self
+    {
+        ActivationLayer{
+            activation: Activation::empty(),
+            z: Default::default(),
+        }
+    }
 }
 
 impl Layerable for Layer
@@ -33,25 +66,24 @@ impl Layerable for Layer
         let r = X.dot(&self.weights);
         self.input = X.clone();
         let z = &r + &self.bias ;
-        self.z = z.clone();
-        let a = z.mapv(|zi| (&self.activation.activation)(zi));  //map_axis(Axis(1), |row| (self.activation.activation)(row.to_owned()));
-        a
+        z
     }
     /// dC_da e { b x f }
-    fn backward_propagation(&mut self, dC_da : &Array2<f32>) -> Array2<f32>
+    fn backward_propagation(&mut self, delta : &Array2<f32>) -> Array2<f32>
     {
         // e { b X f }
-        let da_dz = self.z.mapv(|zi| (&self.activation.derivative_activation)(zi));//(self.activation.derivative_activation)(self.z.view());
+//        let da_dz = self.z.mapv(|zi| (&self.activation.derivative_activation)(zi));//(self.activation.derivative_activation)(self.z.view());
         // e { b X f }
-        let delta = dC_da * da_dz;
+//        let delta = dC_da * da_dz;
+//        let b = *delta;
         let dz_db = 1.;
         let dz_dw = &self.input;
 
         // e { i X f }
         let dz_dal_1 = self.weights.clone();
-        let b_update = (&delta * dz_db).sum_axis(Axis(0));
+        let b_update = (delta * dz_db).sum_axis(Axis(0));
         self.bias = &self.bias - ALPHA * b_update;
-        let w_update = &self.input.t().dot(&delta);
+        let w_update = &self.input.t().dot(delta);
         self.weights = &self.weights - ALPHA * w_update;
 
         // e { b X i }
@@ -81,11 +113,11 @@ impl Layer {
         Layer {
             //            number_of_inputs,
             //            number_of_nodes,
-            activation,
+//            activation,
             weights,
             bias,
             input: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize)),
-            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
+//            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
         }
     }
     pub fn new(number_of_inputs: u32, number_of_nodes: u32, activation: Option<Activation>) -> Layer {
@@ -106,11 +138,11 @@ impl Layer {
         Layer {
 //            number_of_inputs,
 //            number_of_nodes,
-            activation,
+//            activation,
             weights,
             bias,
             input: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize)),
-            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
+//            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
         }
     }
 
