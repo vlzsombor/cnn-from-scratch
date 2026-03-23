@@ -3,39 +3,49 @@ use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
 #[derive(Debug)]
 pub struct Activation{
-    pub activation: fn(Array1<f32>) -> Array1<f32>,
+    pub activation: fn(f32) -> f32,
 //    pub derivative_activation: fn(ArrayView1<f32>) -> Array1<f32>,
-    pub derivative_activation: fn(ArrayView2<f32>) -> Array2<f32>,
+    pub derivative_activation: fn(f32) -> f32,
 }
-pub const ALPHA: f32 = 0.001;
+pub const ALPHA: f32 = 0.0001;
 impl Activation {
     pub fn empty() -> Self{
         Activation{
-            activation: Self::empty_fn,
+            activation: Self::empty_fn_s,
             derivative_activation: |x| {
-                Array2::ones(x.raw_dim())
+                1.
+                //Array2::ones(x.raw_dim())
             },
         }
     }
 
     pub fn relu() -> Self{
         Activation{
-            activation: Self::ReLU,
-            derivative_activation: Self::ReLU_derivative,
+            activation: Self::ReLU_scalar,
+            derivative_activation: Self::ReLU_derivative_s,
         }
     }
 
-    pub fn softmax() -> Self{
-        Activation{
-            activation: softmax,
-            derivative_activation: |x| Array2::ones(x.raw_dim())
-        }
-    }
+//    pub fn softmax() -> Self{
+//        Activation{
+//            activation: softmax,
+//            derivative_activation: |x| Array2::ones(x.raw_dim())
+//        }
+//    }
 
+    fn ReLU_derivative_s(x: f32) -> f32
+    {
+        if x > 0. { 1.0 } else { 0.0 }
+    }
     #[allow(non_snake_case)]
     fn ReLU_derivative(x: ArrayView2<f32>) -> Array2<f32>
     {
-       x.mapv(|xi| if xi < 0. { 0. } else { 1.0 })
+        x.mapv(|xi| if xi > 0. { 1.0 } else { 0.0 })
+    }
+
+    fn ReLU_scalar(x: f32) -> f32
+    {
+        x.max(0.0)
     }
     #[allow(non_snake_case)]
     fn ReLU(x: Array1<f32>) -> Array1<f32>
@@ -43,6 +53,10 @@ impl Activation {
         x.mapv(|xi| xi.max(0.0))
     }
 
+    fn empty_fn_s(x: f32) -> f32
+    {
+        x
+    }
     fn empty_fn(x: Array1<f32>) -> Array1<f32>{
         x
     }

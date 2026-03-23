@@ -1,3 +1,5 @@
+extern crate core;
+
 use crate::train::layer::{Activation, Layer};
 use crate::train::layer_container::{loss, loss_derivate, LayerContainer};
 use ndarray::{array, Array1, Array2, Axis};
@@ -17,7 +19,7 @@ fn generate_xor_dataset() -> (Array2<f32>, Array2<f32>) {
                                 [1.,1.],
     ];
     // let y: Array1<f32> = 2.0 * &x.column(0) + 3.0 * &x.column(1) - 1.0;
-    let y = array![[0.], [1.], [1.],[0.]];
+    let y = array![[0., 1.], [1., 0.], [1., 0.],[0., 1.]];
     (x, y)
 }
 fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
@@ -30,7 +32,8 @@ fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
 fn main() {
     let layers: Vec<Layer> = vec![
         Layer::new(2, 64, Some(Activation::relu())),
-        Layer::new(64, 1, Some(Activation::relu())),
+        Layer::new(64, 64, Some(Activation::relu())),
+        Layer::new(64, 2, None),
     ];
     let mut sut = LayerContainer::new_layers(layers);
 
@@ -38,12 +41,12 @@ fn main() {
 
     let mut y_hat = sut.forward(&X);
     let l1 = loss(&y_hat, &y);
-    for i in 0..12500{
+    for i in 0..10000{
         y_hat = sut.forward(&X);
         sut.backward_propagation(loss_derivate(&y_hat, &y));
-        if i % 50 == 0 {
+        if i % 100 == 0 {
             let l = loss(&y_hat, &y);
-            dbg!(l);
+            dbg!(i, l);
         }
     }
     let l2 = loss(&y_hat, &y);

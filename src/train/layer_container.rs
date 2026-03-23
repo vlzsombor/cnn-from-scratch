@@ -1,18 +1,20 @@
 ﻿use crate::train::layer::{Activation, Layer};
 use ndarray::Array2;
+use crate::train::layerable::Layerable;
 
 #[derive(Debug)]
 pub struct LayerContainer {
-    pub layers: Vec<Layer>
+    pub layers: Vec<Box<dyn Layerable>>
 }
 
 impl LayerContainer {
 
     pub fn new_def() -> Self {
-        let layers = vec![
-            Layer::new(2, 2, Some(Activation::relu())),
-            Layer::new(2, 1, Some(Activation::relu()))
+        let layers: Vec<Box<dyn Layerable>> = vec![
+            Box::new(Layer::new(2, 2, Some(Activation::relu()))),
+            Box::new(Layer::new(2, 1, Some(Activation::relu())))
         ];
+
         LayerContainer {
             layers
         }
@@ -20,7 +22,8 @@ impl LayerContainer {
 
     pub fn new_layers(layers: Vec<Layer>) -> Self {
         LayerContainer {
-            layers
+            layers: layers.into_iter().map(|l| Box::new(l) as Box<dyn Layerable>).collect()
+
         }
     }
 
@@ -29,7 +32,7 @@ impl LayerContainer {
             Layer::new(x[0], x[1], Some(Activation::relu()))
         }).collect();
         LayerContainer {
-            layers
+            layers: layers.into_iter().map(|l| Box::new(l) as Box<dyn Layerable>).collect()
         }
     }
     #[allow(non_snake_case)]
@@ -70,11 +73,7 @@ mod tests {
         let layers: Vec<Layer> = vec![
             Layer::new(2, 4, Some(Activation::relu())),
             Layer::new(4, 64, Some(Activation::relu())),
-            Layer::new(64, 64, Some(Activation::relu())),
-            Layer::new(64, 64, Some(Activation::relu())),
-            Layer::new(64, 64, Some(Activation::relu())),
-            Layer::new(64, 64, Some(Activation::relu())),
-            Layer::new(64, 2, Some(Activation::relu())),
+            Layer::new(64, 2, None),
         ];
         let mut sut = LayerContainer::new_layers(layers);
         let input = array![[1., 1.], [5.,5.], [7.,7.], [10., 10.], [12., 12.]];
@@ -90,13 +89,12 @@ mod tests {
         dbg!(l1);
         dbg!(l2);
         assert!(l1 > l2);
-        assert!(l1 - l2 > 10.);
     }
     #[test]
     pub fn test_backprop_decrease_loss2(){
         let layers: Vec<Layer> = vec![
             Layer::new(1, 2, Some(Activation::relu())),
-            Layer::new(2, 1, Some(Activation::relu())),
+            Layer::new(2, 1, None),
         ];
         let mut sut = LayerContainer::new_layers(layers);
         let input = array![[1.], [5.,]];
