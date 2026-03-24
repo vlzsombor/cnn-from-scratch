@@ -1,7 +1,8 @@
 ﻿use crate::train::layer::{Activation, Layer};
 use ndarray::Array2;
 use crate::train::layerable::Layerable;
-
+use crate::train::loss_functions::{softmax, EPSILON};
+use crate::util::util::accuracy;
 #[derive(Debug)]
 pub struct LayerContainer {
     pub layers: Vec<Box<dyn Layerable>>
@@ -62,17 +63,32 @@ pub fn loss(y_hat: &Array2<f32>, y: &Array2<f32>) -> f32 {
     1.0 / (y_hat.nrows() as f32) * ((y - y_hat) * (y - y_hat)).sum()
 }
 
-pub fn loss_derivate(y_hat: &Array2<f32>, y: &Array2<f32>) -> Array2<f32> {
+pub fn mse_loss_derivative(y_hat: &Array2<f32>, y: &Array2<f32>) -> Array2<f32> {
     2.0 / (y_hat.nrows() as f32) * (y_hat - y)
+}
+
+pub fn cross_entropy_loss_and_softmax(y_hat: &Array2<f32>, y: &Array2<f32>) -> Array2<f32> {
+    let softmax = softmax(y_hat.view());
+    softmax - y
+}
+
+pub fn cross_entropy_loss(y_hat: &Array2<f32>, y: &Array2<f32>) -> f32 {
+    let batch = y_hat.shape()[0] as f32;
+    let loss = -( y * y_hat.mapv(|x| (x+EPSILON).ln()) ).sum();
+    loss
 }
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
     use crate::train::layer::{Activation, ActivationLayer, Layer};
-    use crate::train::layer_container::{loss, loss_derivate, LayerContainer};
+    use crate::train::layer_container::{cross_entropy_loss_and_softmax, loss, mse_loss_derivative, LayerContainer};
     use approx::assert_abs_diff_eq;
-    use ndarray::{array, Array2, ArrayBase, Ix2, OwnedRepr};
+    use ndarray::{array, Array2, ArrayBase, Axis, Ix2, OwnedRepr};
     use crate::{debug_array, generate_xor_dataset};
     use crate::train::layerable::Layerable;
+    use crate::util::util::{accuracy, debug_array, normalize_features};
 
     #[test]
     pub fn multi_layer(){
@@ -89,7 +105,7 @@ mod tests {
         let l1 = loss(&y_hat, &y);
         for _ in 0..1000{
             y_hat = sut.forward(&input);
-            sut.backward_propagation(loss_derivate(&y_hat, &y));
+            sut.backward_propagation(mse_loss_derivative(&y_hat, &y));
         }
         let l2 = loss(&y_hat, &y);
         dbg!(l1);
@@ -112,7 +128,7 @@ mod tests {
         let l1 = loss(&y_hat, &y);
         for _ in 0..100{
             y_hat = sut.forward(&input);
-            sut.backward_propagation(loss_derivate(&y_hat, &y));
+            sut.backward_propagation(mse_loss_derivative(&y_hat, &y));
         }
         let l2 = loss(&y_hat, &y);
         dbg!(l1);
@@ -133,7 +149,7 @@ mod tests {
         let l1 = loss(&y_hat, &y);
         for _ in 0..100{
             y_hat = sut.forward(&input);
-            sut.backward_propagation(loss_derivate(&y_hat, &y));
+            sut.backward_propagation(mse_loss_derivative(&y_hat, &y));
         }
         let l2 = loss(&y_hat, &y);
         dbg!(l1);
@@ -158,7 +174,7 @@ mod tests {
         let l1 = loss(&y_hat, &y);
         for i in 0..10000{
             y_hat = sut.forward(&X);
-            sut.backward_propagation(loss_derivate(&y_hat, &y));
+            sut.backward_propagation(mse_loss_derivative(&y_hat, &y));
             if i % 1000 == 0 {
                 let l = loss(&y_hat, &y);
             }
@@ -203,5 +219,84 @@ mod tests {
         assert_abs_diff_eq!(&res, &expected, epsilon = 1e-4);
     }
 
+    #[test]
+    pub fn iris_dataset_test()
+    {
+        let r = load_iris("src/data/Iris.csv").unwrap();
+        let result = train_iris(&r);
+        assert!(result.is_some());
+
+        assert!(result.unwrap() > 0.9);
+    }
+    fn train_iris(data: &Vec<(Vec<f32>, String)>) -> Option<f32>
+    {
+        let X: Vec<f32> = data.iter()
+            .map(|(x, _)| x)
+            .flatten()
+            .copied()
+            .collect();
+
+        let X: Array2<f32> = Array2::from_shape_vec((150, &X.len()/150), X).unwrap();
+        let X = normalize_features(&X);
+        let label: Vec<Vec<f32>> = data
+            .iter()
+            .map(|(_, y)| {
+                if y == "Iris-setosa" { vec![1.0, 0.0, 0.0] } else if y == "Iris-versicolor" { vec![0.0, 1.0, 0.0] } else { vec![0.0, 0.0, 1.0]}
+            })
+            .collect();
+
+        let flat: Vec<f32> = label.iter().flatten().cloned().collect();
+        let y = Array2::from_shape_vec((label.len(), label[0].len()), flat).unwrap();
+        //    let y :Array2<f32> = Array2::from_shape_vec((150,1), label).unwrap();
+        let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
+            Box::new(Layer::new(4, 32)),
+            //        Box::new(ActivationLayer::relu()),
+            Box::new(ActivationLayer::relu()),
+            Box::new(Layer::new(32, 64)),
+            Box::new(ActivationLayer::relu()),
+            Box::new(Layer::new(64, 3)),
+            //        Box::new(ActivationLayer::softmax_with_cross_entropy_loss()),
+        ];
+        let mut sut = LayerContainer::new_layers_boxed(layers);
+        for i in 0..100{
+            let y_hat = sut.forward(&X);
+            sut.backward_propagation(cross_entropy_loss_and_softmax(&y_hat, &y));
+            if i < 20  {
+                let accuracy = accuracy(&y_hat, &y);
+                dbg!(accuracy);
+            }
+        }
+        let y_hat = sut.forward(&X);
+        let accuracy = accuracy(&y_hat, &y);
+        Some(accuracy)
+    }
+    fn load_iris(path: &str) -> Result<Vec<(Vec<f32>, String)>, Box<dyn Error>> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+
+        let mut data = Vec::new();
+
+        for line in reader.lines().skip(1) {
+            let line = line?;
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() == 6 {
+                let class = parts[5];
+                let features: Vec<f32> = parts[1..5]
+                    .iter()
+                    .filter_map(|s| s.parse().ok())
+                    .collect();
+
+                data.push((features, class.to_string()));
+            }
+        }
+        if data.is_empty() {
+            return Err("Keine Daten gefunden".into());
+        }
+        Ok(data)
+    }
 
 }

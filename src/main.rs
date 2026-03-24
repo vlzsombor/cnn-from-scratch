@@ -1,14 +1,17 @@
 extern crate core;
 
 use crate::train::layer::{Activation, ActivationLayer, Layer};
-use crate::train::layer_container::{loss, loss_derivate, LayerContainer};
+use crate::train::layer_container::{cross_entropy_loss, loss, mse_loss_derivative, cross_entropy_loss_and_softmax, LayerContainer};
 use ndarray::{array, Array, Array1, Array2, Axis, Shape};
 use ndarray_rand::RandomExt;
 use rand_distr::StandardNormal;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use crate::train::loss_functions::softmax;
+use crate::util::mnist_helper::{load_mnist, train_mnist};
 
+pub mod util;
 mod input_transform;
 pub mod train;
 
@@ -31,87 +34,9 @@ fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
 }
 
 
-pub fn debug_array(a: &Array2<f32>) {
-    let rows: Vec<String> = a.rows().into_iter()
-        .map(|row| {
-            let vals: Vec<String> = row.iter().map(|x| format!("{:.3}", x)).collect();
-            format!("[{}]", vals.join(", "))
-        })
-        .collect();
-    println!("[{}]", rows.join(", "));
-}
 
 fn main() {
-
-    let r = load_iris("/src/data/Iris.csv").unwrap();
-    let a = train(r);
-}
-fn train(data: &Vec<(Vec<f32>, String)>) -> Option<i32>
-{
-    let X: Vec<f32> = data.iter()
-        .map(|(x, _)| x)
-        .flatten()
-        .copied()
-        .collect();
-
-    let X: Array2<f32> = Array2::from_shape_vec((150, &X.len()/150), X).unwrap();
-    let label: Vec<f32> = data
-        .iter()
-        .map(|(_, y)| {
-            if y == "Iris-setosa" { 0. } else { 1. }
-        })
-        .collect();
-    let y :Array2<f32> = Array2::from_shape_vec((150,1), label).unwrap();
-    let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-        Box::new(Layer::new(2, 64)),
-        Box::new(ActivationLayer::relu()),
-        Box::new(Layer::new(64, 64)),
-        Box::new(ActivationLayer::relu()),
-        Box::new(Layer::new(64, 2)),
-    ];
-    let mut sut = LayerContainer::new_layers_boxed(layers);
-    for i in 0..10000{
-        let y_hat = sut.forward(&X);
-        sut.backward_propagation(loss_derivate(&y_hat, &y));
-        if i % 1000 == 0 {
-            let l = loss(&y_hat, &y);
-            dbg!(&l);
-        }
-    }
-
-    let y_hat = sut.forward(&X);
-    let l = loss(&y_hat, &y);
-    dbg!(&l);
-
-    Some(0)
-}
-fn load_iris(path: &str) -> Result<Vec<(Vec<f32>, String)>, Box<dyn Error>> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-
-    let mut data = Vec::new();
-
-    for line in reader.lines().skip(1) {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let parts: Vec<&str> = line.split(',').collect();
-        if parts.len() == 6 {
-            let class = parts[5];
-            let features: Vec<f32> = parts[1..5]
-                .iter()
-                .filter_map(|s| s.parse().ok())
-                .collect();
-
-            data.push((features, class.to_string()));
-        }
-    }
-
-    if data.is_empty() {
-        return Err("Keine Daten gefunden".into());
-    }
-
-    Ok(data)
+    let (X, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
+    let accuracy = train_mnist(X,y).unwrap();
+    dbg!(&accuracy);
 }

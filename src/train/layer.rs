@@ -33,19 +33,21 @@ impl Layerable for ActivationLayer
 {
     fn forward(&mut self, X: &Array2<f32>) -> Array2<f32> {
         self.z = X.clone();
-        X.mapv(&self.activation.activation)
+        (&self.activation.activation)(X.view())
+//        X.mapv(&self.activation.activation)
     }
 
     fn backward_propagation(&mut self, dC_da: &Array2<f32>) -> Array2<f32> {
-        self.z.mapv(&self.activation.derivative_activation) * dC_da
+        let r= (&self.activation.derivative_activation)(self.z.view()) * dC_da;
+        r
+//        self.z.mapv(&self.activation.derivative_activation) * dC_da
     }
 }
 impl ActivationLayer
 {
-    pub fn sigmoid_with_cross_entropy_loss() -> Self
+    pub fn softmax_with_cross_entropy_loss() -> Self
     {
-        todo!();
-        Self::new(Activation::relu())
+        Self::new(Activation::softmax())
     }
     pub fn relu() -> Self
     {
@@ -59,7 +61,12 @@ impl ActivationLayer
         }
     }
 }
-
+fn xavier(input: usize, out: usize) -> Array2<f32> {
+    let limit = (6.0 / (input + out) as f32).sqrt();
+    Array2::from_shape_fn((input, out), |_| {
+    rand::random::<f32>() * 2.0 * limit - limit
+    })
+}
 impl Layerable for Layer
 {
     #[allow(non_snake_case)]
@@ -104,6 +111,7 @@ impl Layer {
             StandardNormal,
             &mut rng
         );
+
         //        let bias: f32 = rng.random();
         let bias: Array1<f32> =  Array1::random_using(
             number_of_nodes as usize,
@@ -122,11 +130,13 @@ impl Layer {
     }
     pub fn new(number_of_inputs: u32, number_of_nodes: u32) -> Layer {
 //        let mut rng = ChaCha8Rng::seed_from_u64(state); // fixed seed
-        let weights = Array2::random(
-            (number_of_inputs as usize, number_of_nodes as usize),
-            StandardNormal,
-//            &mut rng
-        );
+//        let weights = Array2::random(
+//            (number_of_inputs as usize, number_of_nodes as usize),
+//            StandardNormal,
+////            &mut rng
+//        );
+        let weights = xavier(number_of_inputs as usize, number_of_nodes as usize);
+
 //        let bias: f32 = rng.random();
         let bias: Array1<f32> =  Array1::random(
             number_of_nodes as usize,
@@ -142,13 +152,6 @@ impl Layer {
             input: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize)),
 //            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
         }
-    }
-
-    //todo remove this method
-    fn to_array2(nested: Array<Array1<f32>, Ix1>) -> Array2<f32> {
-        let views: Vec<_> = nested.iter().map(|a| a.view()).collect();
-        stack(Axis(0), &views)
-            .expect("Arrays must have the same length to stack into a matrix")
     }
 }
 
@@ -173,14 +176,14 @@ mod tests {
         assert_abs_diff_eq!(&res, &expected, epsilon = 1e-4);
     }
 
-    #[test]
-    fn test_layer_stats_normal() {
-        let layer = Layer::new(100, 50);
-        let mean = layer.weights.mean().unwrap();
-        let std = layer.weights.std(0.); // population std
-
-        // Rough checks for StandardNormal (μ=0, σ=1)
-        assert!((-0.2..=0.2).contains(&mean));
-        assert!((0.8..=1.2).contains(&std));
-    }
+//    #[test]
+//    fn test_layer_stats_normal() {
+//        let layer = Layer::new(100, 50);
+//        let mean = layer.weights.mean().unwrap();
+//        let std = layer.weights.std(0.); // population std
+//
+//        // Rough checks for StandardNormal (μ=0, σ=1)
+//        assert!((-0.2..=0.2).contains(&mean));
+//        assert!((0.8..=1.2).contains(&std));
+//    }
 }
