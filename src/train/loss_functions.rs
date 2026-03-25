@@ -25,9 +25,9 @@ pub fn cross_entropy_loss(y: Array1<f32>, y_hat: Array1<f32>) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::train::loss_functions::{cross_entropy_loss, softmax, EPSILON};
+    use crate::train::loss_functions::{cross_entropy_loss};
     use approx::assert_abs_diff_eq;
-    use ndarray::{array, Array1, Array2};
+    use ndarray::{array, Array1};
 
     #[test]
     pub fn test1()

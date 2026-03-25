@@ -1,5 +1,5 @@
-﻿use ndarray::{Array2, Axis};
-use crate::train::loss_functions::softmax;
+﻿use crate::train::loss_functions::softmax;
+use ndarray::{Array2, Axis};
 
 pub fn one_hot(labels: &[usize], num_classes: usize) -> Array2<f32>
 {

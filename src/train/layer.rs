@@ -1,11 +1,11 @@
-﻿pub(crate) use crate::train::activation::{Activation};
+﻿pub(crate) use crate::train::activation::Activation;
+use crate::train::layerable::Layerable;
 use ndarray::linalg::Dot;
-use ndarray::{stack, Array, Array1, Array2, Axis, Ix1};
+use ndarray::{Array1, Array2, Axis};
 use ndarray_rand::rand::SeedableRng;
 use ndarray_rand::rand_distr::StandardNormal;
 use ndarray_rand::RandomExt;
 use rand_chacha::ChaCha8Rng;
-use crate::train::layerable::Layerable;
 
 #[derive(Debug)]
 pub struct Layer
@@ -87,7 +87,7 @@ impl Layerable for Layer
 //        let delta = dC_da * da_dz;
 //        let b = *delta;
         let dz_db = 1.;
-        let dz_dw = &self.input;
+        let _dz_dw = &self.input;
 
         // e { i X f }
         let dz_dal_1 = self.weights.clone();
