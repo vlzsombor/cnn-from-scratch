@@ -1,4 +1,4 @@
-﻿pub(crate) use crate::train::activation::{Activation, ALPHA};
+﻿pub(crate) use crate::train::activation::{Activation};
 use ndarray::linalg::Dot;
 use ndarray::{stack, Array, Array1, Array2, Axis, Ix1};
 use ndarray_rand::rand::SeedableRng;
@@ -17,6 +17,7 @@ pub struct Layer
     /// raw input from the previous layer
     /// input e { batch X features }
     input: Array2<f32>,
+    alpha: f32
 }
 
 #[derive(Debug)]
@@ -91,9 +92,9 @@ impl Layerable for Layer
         // e { i X f }
         let dz_dal_1 = self.weights.clone();
         let b_update = (delta * dz_db).sum_axis(Axis(0));
-        self.bias = &self.bias - ALPHA * b_update;
+        self.bias = &self.bias - self.alpha * b_update;
         let w_update = &self.input.t().dot(delta);
-        self.weights = &self.weights - ALPHA * w_update;
+        self.weights = &self.weights - self.alpha * w_update;
 
         // e { b X i }
         let r = delta.dot(&dz_dal_1.t());
@@ -104,7 +105,7 @@ impl Layer {
     pub fn get_shape(&self) -> &[usize] {
         self.weights.shape()
     }
-    pub fn new_deterministic(number_of_inputs: u32, number_of_nodes: u32, state: Option<u64>) -> Layer {
+    pub fn new_deterministic(number_of_inputs: u32, number_of_nodes: u32, state: Option<u64>, alpha:f32) -> Layer {
         let mut rng = ChaCha8Rng::seed_from_u64(state.unwrap_or(42));
         let weights = Array2::random_using(
             (number_of_inputs as usize, number_of_nodes as usize),
@@ -126,9 +127,10 @@ impl Layer {
             bias,
             input: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize)),
 //            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
+            alpha
         }
     }
-    pub fn new(number_of_inputs: u32, number_of_nodes: u32) -> Layer {
+    pub fn new(number_of_inputs: u32, number_of_nodes: u32, alpha: f32) -> Layer {
 //        let mut rng = ChaCha8Rng::seed_from_u64(state); // fixed seed
 //        let weights = Array2::random(
 //            (number_of_inputs as usize, number_of_nodes as usize),
@@ -151,6 +153,7 @@ impl Layer {
             bias,
             input: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize)),
 //            z: Array2::zeros((number_of_inputs as usize, number_of_nodes as usize))
+            alpha
         }
     }
 }
@@ -167,9 +170,9 @@ mod tests {
 
     #[test]
     fn test_neural_layer_seeded_reproducible() {
-        let layer1 = Layer::new(3, 4);
+        let layer1 = Layer::new(3, 4, 0.001);
         assert_eq!(layer1.weights.shape(), &[3, 4]);
-        let mut nnlayer1 = Layer::new_deterministic(2, 2, None);
+        let mut nnlayer1 = Layer::new_deterministic(2, 2, None, 0.001);
         let input: Array2<f32> = Array2::from(vec![[4.0, 2.0], [3.0, 2.0]]);
         let res = nnlayer1.forward(&input);
         let expected :Array2<f32>= array! [[0.97810096, 5.3549976], [0.50011975, 4.020927]];

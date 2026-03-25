@@ -51,11 +51,12 @@ pub fn train_mnist(X: Array2<f32>, y: Array1<f32>) -> Option<f32>
     let slice: Vec<usize> = y.iter().map(|&x| x as usize).collect();
     let y_train = one_hot(&slice, 10).slice((s![..subslice, ..])).to_owned();
     let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-        Box::new(Layer::new((28*28), 128)),
+
+        Box::new(Layer::new((28*28), 128, 0.0001)),
         Box::new(ActivationLayer::relu()),
-        Box::new(Layer::new(128, 128)),
+        Box::new(Layer::new(128, 128,  0.0001)),
         Box::new(ActivationLayer::relu()),
-        Box::new(Layer::new(128, 10)),
+        Box::new(Layer::new(128, 10, 0.0001)),
         //        Box::new(ActivationLayer::softmax_with_cross_entropy_loss()),
     ];
     let mut sut = LayerContainer::new_layers_boxed(layers);
@@ -77,4 +78,20 @@ pub fn train_mnist(X: Array2<f32>, y: Array1<f32>) -> Option<f32>
     let accuracy = accuracy(&y_hat, &y_test);
     dbg!(X_test.raw_dim(), y_hat.dim());
     Some(accuracy)
+}
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use crate::util::mnist_helper::{load_mnist, train_mnist};
+
+    #[ignore]
+    #[test]
+    pub fn mnist() {
+        let (X, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
+        let accuracy = train_mnist(X,y).unwrap();
+        assert!(accuracy>0.85)
+    }
 }

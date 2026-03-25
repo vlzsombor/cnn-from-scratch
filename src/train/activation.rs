@@ -7,7 +7,6 @@ pub struct Activation{
     pub derivative_activation: fn(ArrayView2<f32>) -> Array2<f32>,
 //    pub derivative_activation: fn(f32) -> f32,
 }
-pub const ALPHA: f32 = 0.0001;
 impl Activation {
 
     pub fn relu() -> Self{

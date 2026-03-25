@@ -12,8 +12,8 @@ impl LayerContainer {
 
     pub fn new_def() -> Self {
         let layers: Vec<Box<dyn Layerable>> = vec![
-            Box::new(Layer::new(2, 2)),
-            Box::new(Layer::new(2, 1))
+            Box::new(Layer::new(2, 2, 0.001)),
+            Box::new(Layer::new(2, 1, 0.001))
         ];
 
         LayerContainer {
@@ -32,9 +32,9 @@ impl LayerContainer {
         }
     }
 
-    pub fn new(layer_number: Vec<[u32; 2]>) -> Self {
+    pub fn new(layer_number: Vec<[u32; 2]>, alpha: f32) -> Self {
         let layers: Vec<Layer> = layer_number.iter().map(|x|{
-            Layer::new(x[0], x[1])
+            Layer::new(x[0], x[1], alpha)
         }).collect();
         LayerContainer {
             layers: layers.into_iter().map(|l| Box::new(l) as Box<dyn Layerable>).collect()
@@ -86,16 +86,16 @@ mod tests {
     use crate::train::layer_container::{cross_entropy_loss_and_softmax, loss, mse_loss_derivative, LayerContainer};
     use approx::assert_abs_diff_eq;
     use ndarray::{array, Array2, ArrayBase, Axis, Ix2, OwnedRepr};
-    use crate::{debug_array, generate_xor_dataset};
+    use crate::{generate_xor_dataset};
     use crate::train::layerable::Layerable;
     use crate::util::util::{accuracy, debug_array, normalize_features};
 
     #[test]
     pub fn multi_layer(){
         let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-            Box::new(Layer::new(2, 4)),
+            Box::new(Layer::new(2, 4, 0.001)),
             Box::new(ActivationLayer::relu()),
-            Box::new(Layer::new(4, 2)),
+            Box::new(Layer::new(4, 2, 0.001)),
         ];
         let mut sut = LayerContainer::new_layers_boxed(layers);
         let input = array![[1., 1.], [5.,5.], [7.,7.], [10., 10.], [12., 12.]];
@@ -115,9 +115,9 @@ mod tests {
     #[test]
     pub fn test_backprop_decrease_loss2(){
         let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-            Box::new(Layer::new(1, 2)),
+            Box::new(Layer::new(1, 2, 0.001)),
             Box::new(ActivationLayer::relu()),
-            Box::new(Layer::new(2, 1)),
+            Box::new(Layer::new(2, 1, 0.001)),
         ];
         let mut sut = LayerContainer::new_layers_boxed(layers);
         let input = array![[1.], [5.,]];
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     pub fn test_backprop_decrease_loss(){
         let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-            Box::new(Layer::new(2, 2)),
+            Box::new(Layer::new(2, 2, 0.001)),
         ];
         let mut sut = LayerContainer::new_layers_boxed(layers);
         let input = array![[1.,1.], [5.,5.]];
@@ -160,11 +160,11 @@ mod tests {
     pub fn xor()
     {
         let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-            Box::new(Layer::new(2, 64)),
+            Box::new(Layer::new(2, 64, 0.001)),
             Box::new(ActivationLayer::relu()),
-            Box::new(Layer::new(64, 64)),
+            Box::new(Layer::new(64, 64, 0.001)),
             Box::new(ActivationLayer::relu()),
-            Box::new(Layer::new(64, 2)),
+            Box::new(Layer::new(64, 2, 0.001)),
         ];
         let mut sut = LayerContainer::new_layers_boxed(layers);
 
@@ -194,9 +194,9 @@ mod tests {
 
 
         let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-            Box::new(Layer::new_deterministic(3, 2, None)),
+            Box::new(Layer::new_deterministic(3, 2, None, 0.001)),
             Box::new(ActivationLayer::relu()),
-            Box::new(Layer::new_deterministic(2, 1, None)),
+            Box::new(Layer::new_deterministic(2, 1, None, 0.001)),
             Box::new(ActivationLayer::relu()),
         ];
 
@@ -249,12 +249,12 @@ mod tests {
         let y = Array2::from_shape_vec((label.len(), label[0].len()), flat).unwrap();
         //    let y :Array2<f32> = Array2::from_shape_vec((150,1), label).unwrap();
         let layers: Vec<Box<dyn crate::train::layerable::Layerable>> = vec![
-            Box::new(Layer::new(4, 32)),
+            Box::new(Layer::new(4, 32, 0.001)),
             //        Box::new(ActivationLayer::relu()),
             Box::new(ActivationLayer::relu()),
-            Box::new(Layer::new(32, 64)),
+            Box::new(Layer::new(32, 64, 0.001)),
             Box::new(ActivationLayer::relu()),
-            Box::new(Layer::new(64, 3)),
+            Box::new(Layer::new(64, 3, 0.001)),
             //        Box::new(ActivationLayer::softmax_with_cross_entropy_loss()),
         ];
         let mut sut = LayerContainer::new_layers_boxed(layers);

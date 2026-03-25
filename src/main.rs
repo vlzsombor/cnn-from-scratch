@@ -36,7 +36,4 @@ fn generate_linear_dataset(n_samples: usize) -> (Array2<f32>, Array2<f32>) {
 
 
 fn main() {
-    let (X, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
-    let accuracy = train_mnist(X,y).unwrap();
-    dbg!(&accuracy);
 }
