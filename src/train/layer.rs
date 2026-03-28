@@ -62,7 +62,7 @@ impl ActivationLayer
         }
     }
 }
-fn xavier(input: usize, out: usize) -> Array2<f32> {
+pub fn xavier(input: usize, out: usize) -> Array2<f32> {
     let limit = (6.0 / (input + out) as f32).sqrt();
     Array2::from_shape_fn((input, out), |_| {
     rand::random::<f32>() * 2.0 * limit - limit

@@ -7,6 +7,8 @@ pub mod train;
 
 
 fn main() {
-    let (x, y) = load_mnist("C:\\Users\\ZsomborVeres-Lakos\\Downloads\\trainData.csv").unwrap();
+    let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
+
+//    let (x, y) = load_mnist("C:\\Users\\ZsomborVeres-Lakos\\Downloads\\trainData.csv").unwrap();
     let accuracy = train_mnist_cnn(x,y).unwrap();
 }
