@@ -1,4 +1,4 @@
-﻿use ndarray::{array, s, Array1, Array2, Array3, Array4, ArrayView2, Axis};
+﻿use ndarray::{array, s, Array1, Array2, Array3, Array4, ArrayView2, Axis, Order};
 use crate::train::activation::ReluActivation;
 use crate::train::layer::{xavier, Activation, Layer};
 use crate::train::layerable::Layerable;
@@ -40,7 +40,6 @@ impl ConvolutionalLayer
         }
     }
     fn sub_sampling(&mut self, x: &Array3<f32>, sub_sampling_kernel_size: usize) -> Array3<f32> {
-        dbg!(&x.shape());
         let nrow = x.shape()[1] / sub_sampling_kernel_size;
         let ncolumn = x.shape()[1] / sub_sampling_kernel_size;
         let mut sub_sampled: Array3<f32> = Array3::zeros((x.shape()[0], nrow, ncolumn));
@@ -52,12 +51,11 @@ impl ConvolutionalLayer
                         row..row+sub_sampling_kernel_size,
                         col..col+sub_sampling_kernel_size]
                     );
-                    dbg!(r.shape());
                     sub_sampled[[kernel_idx, row, col]] = r.mean().unwrap();
                 }
             }
         }
-        sub_sampled
+        sub_sampled.get_relu()
     }
 
     fn map_idx(idx: usize) -> usize {
@@ -78,7 +76,7 @@ impl ConvolutionalLayer
         }
     }
 
-    fn c3(&self, s2: &Array3<f32>)
+    fn c3(&self, s2: &Array3<f32>) -> Array3<f32>
     {
         //n_kernel, n_input, rows, cols
         let mut kernels: Array4<f32> = Array4::zeros((16, 6, 5, 5));
@@ -113,6 +111,44 @@ impl ConvolutionalLayer
                 }
             }
         }
+        c3
+    }
+
+    fn c5(&self, s2: &Array3<f32>) -> Array3<f32>
+    {
+        //n_kernel, n_input, rows, cols
+        let mut kernels: Array4<f32> = Array4::zeros((120, 16, 5, 5));
+        let mut biases: Array1<f32> = Array1::zeros((kernels.shape()[0]));
+        let kernel_size = kernels.shape()[2];
+        for k in 0..kernels.shape()[0] {
+            kernels
+                .slice_mut(s![k, 0, .., ..])
+                .assign(&xavier(
+                    kernel_size,
+                    kernel_size)
+                );
+            biases[k] = *xavier(1, 1).first().unwrap();
+        }
+        let mut c3: Array3<f32> = Array3::zeros(
+            (kernels.shape()[0], s2.shape()[1] - kernels.shape()[2] + 1, s2.shape()[2] - kernels.shape()[3] + 1)
+        );
+        for kernel_idx in 0..c3.shape()[0] {
+            for row_idx in 0..c3.shape()[1]
+            {
+                for col_idx in 0..c3.shape()[2]
+                {
+                    let ress: f32 = (0..16)
+                        .map(|x| {
+                            let patch = s2.slice(s![x, row_idx..row_idx+kernel_size, col_idx..col_idx+kernel_size]);
+                            let kernel = kernels.slice(s![kernel_idx, x, .., ..]);
+                            (&patch * &kernel).sum()
+                        })
+                        .sum();
+                    c3[[kernel_idx, row_idx, col_idx]] = Activation::Relu_scalar(ress + biases[kernel_idx]);
+                }
+            }
+        }
+        c3
     }
 }
 impl Layerable for ConvolutionalLayer
@@ -132,7 +168,6 @@ impl Layerable for ConvolutionalLayer
             .unwrap()
             .to_owned();
         let twoD = pad(&twoD, 2, 0.0);
-        dbg!(twoD.dim());
         csv_to_image(&twoD, "before.png");
         let x = twoD;
 
@@ -145,9 +180,6 @@ impl Layerable for ConvolutionalLayer
             x.nrows() - k_rows + 1,
             x.ncols() - k_cols + 1)
         );
-        dbg!(c1_result.shape());
-        dbg!(x.nrows(), x.ncols(),  x.nrows() - k_rows + 1);
-        dbg!(c1_result.shape());
 
 
 
@@ -169,14 +201,17 @@ impl Layerable for ConvolutionalLayer
         let c1_result = &c1_result.get_relu();
 /////////////////////////c1
         let s2 = self.sub_sampling(&c1_result, 2);
-        let s2 = s2.get_relu();
 ////////////////////////s2 ↑
+        let c3 = self.c3(&s2);
+        let s4 = self.sub_sampling(&c3, 2);
+        let c5 = self.c5(&s4);
+        if(!is_effectively_1d(&c5)){
+            todo!()
+        }
+        let flat_view = c5.to_shape((120,)).unwrap();
 
-
-
-//        csv_to_image(&sub_res, "after.png");
-//        sub_res
-        todo!()
+        let twodreturn: Array2<f32> = flat_view.to_shape((1,120)).unwrap().into_owned();
+        twodreturn
     }
 
 
@@ -184,6 +219,10 @@ impl Layerable for ConvolutionalLayer
         todo!()
     }
 }
+fn is_effectively_1d(arr: &Array3<f32>) -> bool {
+    arr.shape()[1] == 1 && arr.shape()[2] == 1
+}
+
 fn pad(input: &Array2<f32>, pad: usize, fill: f32) -> Array2<f32> {
     let (rows, cols) = input.dim();
     let mut output = Array2::from_elem((rows + 2 * pad, cols + 2 * pad), fill);
