@@ -1,5 +1,6 @@
 ﻿use ndarray::{array, s, Array1, Array2, Array3, Array4, ArrayView2, Axis};
-use crate::train::layer::{xavier, Layer};
+use crate::train::activation::ReluActivation;
+use crate::train::layer::{xavier, Activation, Layer};
 use crate::train::layerable::Layerable;
 use crate::util::mnist_helper::{csv_to_image, csv_to_image_oned};
 
@@ -28,7 +29,7 @@ impl ConvolutionalLayer
                     kernel_size as usize,
                     kernel_size as usize)
                 );
-            biases[k] = *xavier(1,1).first().unwrap();
+            biases[k] = *xavier(1, 1).first().unwrap();
         }
 
         ConvolutionalLayer {
@@ -46,7 +47,7 @@ impl ConvolutionalLayer
 
         for kernel_idx in 0..sub_sampled.shape()[0] {
             for row in 0..sub_sampled.shape()[1] {
-                for col in 0..sub_sampled.shape()[2]{
+                for col in 0..sub_sampled.shape()[2] {
                     let r = &x.slice(s![kernel_idx,
                         row..row+sub_sampling_kernel_size,
                         col..col+sub_sampling_kernel_size]
@@ -57,6 +58,61 @@ impl ConvolutionalLayer
             }
         }
         sub_sampled
+    }
+
+    fn map_idx(idx: usize) -> usize {
+        match idx {
+            6.. => idx - 6,
+            _ => idx
+        }
+    }
+    pub fn kernel_idx_to_input_idx(idx: usize) -> Vec<usize> {
+        match idx {
+            0..6 => vec![Self::map_idx(idx), Self::map_idx(idx + 1), Self::map_idx(idx + 2)],
+            6..12 => vec![Self::map_idx(idx), Self::map_idx(idx + 1 - 6), Self::map_idx(idx + 2 - 6), Self::map_idx(idx + 3 - 6)],
+            12 => vec![0, 1, 3, 4],
+            13 => vec![1, 2, 4, 5],
+            14 => vec![0, 2, 3, 5],
+            15 => vec![0, 1, 2, 3, 4, 5],
+            _ => todo!(),
+        }
+    }
+
+    fn c3(&self, s2: &Array3<f32>)
+    {
+        //n_kernel, n_input, rows, cols
+        let mut kernels: Array4<f32> = Array4::zeros((16, 6, 5, 5));
+        let mut biases: Array1<f32> = Array1::zeros((kernels.shape()[0]));
+        let kernel_size = kernels.shape()[2];
+        for k in 0..kernels.shape()[0] {
+            kernels
+                .slice_mut(s![k, 0, .., ..])
+                .assign(&xavier(
+                    kernel_size,
+                    kernel_size)
+                );
+            biases[k] = *xavier(1, 1).first().unwrap();
+        }
+        let mut c3: Array3<f32> = Array3::zeros(
+            (16, s2.shape()[1] - kernels.shape()[2] + 1, s2.shape()[2] - kernels.shape()[3] + 1)
+        );
+        for kernel_idx in 0..c3.shape()[0] {
+            for row_idx in 0..c3.shape()[1]
+            {
+                for col_idx in 0..c3.shape()[2]
+                {
+                    let ress: f32 = Self::kernel_idx_to_input_idx(kernel_idx)
+                        .iter()
+                        .map(|&x| {
+                            let patch = s2.slice(s![x, row_idx..row_idx+kernel_size, col_idx..col_idx+kernel_size]);
+                            let kernel = kernels.slice(s![kernel_idx, x, .., ..]);
+                            (&patch * &kernel).sum()
+                        })
+                        .sum();
+                    c3[[kernel_idx, row_idx, col_idx]] = Activation::Relu_scalar(ress + biases[kernel_idx]);
+                }
+            }
+        }
     }
 }
 impl Layerable for ConvolutionalLayer
@@ -110,11 +166,12 @@ impl Layerable for ConvolutionalLayer
                 }
             }
         }
+        let c1_result = &c1_result.get_relu();
 /////////////////////////c1
-        let sub = self.sub_sampling(&c1_result, 2);
+        let s2 = self.sub_sampling(&c1_result, 2);
+        let s2 = s2.get_relu();
+////////////////////////s2 ↑
 
-
-        dbg!(sub.shape());
 
 
 //        csv_to_image(&sub_res, "after.png");
@@ -134,4 +191,57 @@ fn pad(input: &Array2<f32>, pad: usize, fill: f32) -> Array2<f32> {
         .slice_mut(s![pad..pad + rows, pad..pad + cols])
         .assign(input);
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+    use ndarray::array;
+
+    #[test]
+    fn kernel_idx() {
+
+        let a = (0..16)
+            .for_each(|x|{
+                let mut r = ConvolutionalLayer::kernel_idx_to_input_idx(x);
+                let mut b = kernel_idx_to_input_idx(x);
+                r.sort();
+                b.sort();
+                assert_eq!(r, b)
+            });
+    }
+
+    fn kernel_idx_to_input_idx(idx: usize) -> Vec<usize> {
+        match idx {
+            0  => vec![0, 1, 2],
+            1  => vec![1, 2, 3],
+            2  => vec![2, 3, 4],
+            3  => vec![3, 4, 5],
+            4  => vec![4, 5, 0],
+            5  => vec![5, 0, 1],
+            6  => vec![0, 1, 2, 3],
+            7  => vec![1, 2, 3, 4],
+            8  => vec![2, 3, 4, 5],
+            9  => vec![ 3, 4, 5, 0],
+            10 => vec![0, 1, 4, 5],
+            11 => vec![0, 1, 2, 5],
+            12 => vec![0, 1, 3, 4],
+            13 => vec![1, 2, 4, 5],
+            14 => vec![0, 2, 3, 5],
+            15 => vec![0, 1, 2, 3, 4, 5],
+            _  => panic!("invalid kernel index"),
+        }
+    }
+
+    //    #[test]
+    //    fn test_layer_stats_normal() {
+    //        let layer = Layer::new(100, 50);
+    //        let mean = layer.weights.mean().unwrap();
+    //        let std = layer.weights.std(0.); // population std
+    //
+    //        // Rough checks for StandardNormal (μ=0, σ=1)
+    //        assert!((-0.2..=0.2).contains(&mean));
+    //        assert!((0.8..=1.2).contains(&std));
+    //    }
 }

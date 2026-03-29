@@ -1,5 +1,6 @@
 ﻿use crate::train::loss_functions::softmax;
-use ndarray::{Array2, ArrayView2};
+use ndarray::{Array, Array2, ArrayBase, ArrayView2, DataMut, Dimension};
+use ndarray_rand::rand_distr::num_traits::Float;
 
 #[derive(Debug)]
 pub struct Activation{
@@ -30,4 +31,32 @@ impl Activation {
     {
         x.mapv(|xi| {xi.max(0.0)})
     }
+
+    pub fn Relu_scalar(x: f32) -> f32{
+        x.max(0.0)
+    }
+
+}
+pub trait ReluActivation {
+    type Output;
+    fn get_relu(&self) -> Self::Output;
+}
+impl<D, S, A> ReluActivation for ArrayBase<S, D>
+where
+    D: Dimension,
+    S: DataMut<Elem = A>,
+    A: Float
+{
+    type Output = Array<A, D>;
+    fn get_relu(&self) -> Array<A,D>{
+        self.map(|x| x.max(A::zero()))
+    }
+}
+
+pub fn relu_generic<D,S>(array: &ArrayBase<S, D>) -> Array<f32, D>
+where
+    D: Dimension,
+    S: DataMut<Elem = f32>
+{
+    array.mapv(|e| e.max(0.0))
 }
