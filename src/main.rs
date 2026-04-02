@@ -1,5 +1,6 @@
 extern crate core;
 
+use ndarray::{array, s, Array3, Array4, ArrayView2};
 use crate::train::convolutional_layer::ConvolutionalLayer;
 use crate::train::layer::{ActivationLayer, Layer};
 use crate::train::layer_container::LayerContainer;
@@ -10,6 +11,10 @@ pub mod train;
 
 
 fn main() {
+
+//    assert_eq!(&aslice.row(14), ));
+//    assert_eq!(&aslice, &ressss);
+    return;
     let alpha = 0.001;
     let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
     let cnn = ConvolutionalLayer::new(Layer::new(1, 2, alpha), 28usize);

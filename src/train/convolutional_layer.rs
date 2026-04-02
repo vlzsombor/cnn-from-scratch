@@ -213,8 +213,6 @@ impl Layerable for ConvolutionalLayer
         let twodreturn: Array2<f32> = flat_view.to_shape((1,120)).unwrap().into_owned();
         twodreturn
     }
-
-
     fn backward_propagation(&mut self, dc_da: &Array2<f32>) -> Array2<f32> {
         todo!()
     }
