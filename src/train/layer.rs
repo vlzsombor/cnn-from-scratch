@@ -81,11 +81,6 @@ impl Layerable for Layer
     /// dC_da e { b x f }
     fn backward_propagation(&mut self, delta : &Array2<f32>) -> Array2<f32>
     {
-        // e { b X f }
-//        let da_dz = self.z.mapv(|zi| (&self.activation.derivative_activation)(zi));//(self.activation.derivative_activation)(self.z.view());
-        // e { b X f }
-//        let delta = dC_da * da_dz;
-//        let b = *delta;
         let dz_db = 1.;
         let _dz_dw = &self.input;
 
