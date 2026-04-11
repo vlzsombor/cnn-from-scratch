@@ -6,43 +6,129 @@ use crate::train::activation::ReluActivation;
 use crate::train::layerable::Layerable;
 use pipe::pipe;
 const ALPHA: f32 = 0.0001;
+
+#[derive(Debug, Clone)]
+pub struct ImageData {
+    pub image: Array3<f32>
+}
+impl ImageData{
+    pub fn new(image: Array3<f32>) -> Self{
+        ImageData{
+            image
+        }
+    }
+    pub fn get_channel_number(&self) -> usize {
+        self.image.shape()[0]
+    }
+    pub fn get_row(&self) -> usize {
+        self.image.shape()[1]
+    }
+    pub fn get_col(&self) -> usize {
+        self.image.shape()[2]
+    }
+    pub fn get_image(&self, channel_number: usize) -> ArrayView2<f32>{
+        self.image.slice(s![channel_number, .., ..])
+    }
+
+    pub fn rot180(&self) -> Self {
+        Self::new(self.image.slice(s![.., ..;-1, ..;-1]).to_owned())
+    }
+
+    pub fn get_new_temp_array(&self, kernel: &Kernel) -> Array3<f32> {
+        let (new_r, new_c) = self.get_image_size_after_convolution(kernel);
+        Array3::zeros([kernel.get_output_channel_number(), new_r, new_c])
+    }
+
+    pub fn get_image_size_after_convolution_image_data(&self, image_data: &ImageData) -> (usize, usize) {
+        (self.get_row() - image_data.get_row() + 1, self.get_col() - image_data.get_col() + 1)
+    }
+    pub fn get_image_size_after_convolution(&self, kernel: &Kernel) -> (usize, usize) {
+        (self.get_row() - kernel.get_row() + 1, self.get_col() - kernel.get_col() + 1)
+    }
+}
 #[derive(Debug)]
-pub(crate) struct ConvolutionalMatlab
+pub struct Kernel{
+    kernel: Array4<f32>
+}
+
+impl Kernel{
+
+    pub fn subtract(&mut self, kernel2: &Array4<f32>){
+        self.kernel = &self.kernel - kernel2;
+    }
+    pub fn get_new_temp_array(&self, imageData: &ImageData) -> Array4<f32> {
+        let (new_r, new_c) = imageData.get_image_size_after_convolution(&self);
+        dbg!(imageData.get_row(), imageData.get_col());
+        dbg!(self.get_row(), self.get_col());
+        Array4::zeros([self.get_input_channel_number(), self.get_output_channel_number(), new_r, new_c])
+        //Array3::zeros([kernel.get_output_channel_number(), new_r, new_c])
+    }
+    pub fn get_shape(&self) -> &[usize] {
+        self.kernel.shape()
+    }
+    pub fn get_row(&self) -> usize {
+        self.kernel.shape()[2]
+    }
+    pub fn get_col(&self) -> usize {
+        self.kernel.shape()[3]
+    }
+    pub fn get_image(&self, input: usize, output: usize) -> ArrayView2<f32>{
+        self.kernel.slice(s![input, output, .., ..])
+    }
+    pub fn get_input_channel_number(&self) -> usize {
+        self.kernel.shape()[0]
+    }
+    pub fn get_output_channel_number(&self) -> usize {
+        self.kernel.shape()[1]
+    }
+
+    pub fn new(kernel: Array4<f32>) -> Self
+    {
+        Kernel{
+            kernel
+        }
+    }
+}
+#[derive(Debug)]
+pub struct ConvolutionalMatlab
 {
-    kernel: Array4<f32>,
+    kernel: Kernel,
     biases: Array1<f32>,
     alpha: f32,
-    cached_input: Option<Array3<f32>>
+    cached_input: Option<ImageData>
 }
 
 impl ConvolutionalMatlab
 {
     pub fn new(kernel: Array4<f32>, alpha: f32) -> Self
     {
-        let biases = Array1::zeros(kernel.shape()[0]);// bug in channels should be out channels
+        let k = Kernel::new(kernel);
+        let biases = Array1::zeros(k.get_input_channel_number());// bug in channels should be out channels
         ConvolutionalMatlab
         {
-            kernel,
+            kernel: k,
             biases,
             alpha,
             cached_input: None
         }
     }
-    pub(crate) fn k1_sigma(&mut self, x: &Array3<f32>) -> Array3<f32>
+    pub fn k1_sigma(&mut self, x: &ImageData) -> Array3<f32>
     {
         self.k1(x).get_sigmoid()
     }
-    /// k1 {1,6,5x5}
-    pub(crate) fn k1(&mut self, x: &Array3<f32>) -> Array3<f32>
+    pub fn k1(&mut self, x: &ImageData) -> Array3<f32>
     {
-        assert_eq!(x.shape()[0], self.kernel.shape()[0]);
-        let mut return_res = Array3::zeros([self.kernel.shape()[1], x.shape()[1]-self.kernel.shape()[2] +1, x.shape()[2] -self.kernel.shape()[3] + 1]);
-        for output_index in 0..self.kernel.shape()[1]{
+        assert_eq!(x.get_channel_number(), self.kernel.get_input_channel_number());
+        let (new_row, new_col) = x.get_image_size_after_convolution(&self.kernel);
+        let mut return_res = x.get_new_temp_array(&self.kernel); //Array3::zeros([self.kernel.get_output_channel_number(), new_row, new_col]);
+        for output_index in 0..self.kernel.get_output_channel_number(){
             let mut acc = Array2::zeros((return_res.shape()[1], return_res.shape()[2]));
-            for input_index in 0..self.kernel.shape()[0] {
-                let sub_x = x.slice(s![input_index, .., ..]);
-                let sub_k = self.kernel.slice(s![input_index, output_index, .., ..]);
-                acc = acc + Self::conv2d(&sub_x, &sub_k);
+            for input_index in 0..self.kernel.get_input_channel_number() {
+                let sub_x = x.get_image(input_index);
+                let sub_k = self.kernel.get_image(input_index, output_index);
+                let r =  Self::conv2d(&sub_x, &sub_k);
+
+                acc = r + acc;
             }
             return_res
                 .slice_mut(s![output_index, ..,..])
@@ -52,11 +138,26 @@ impl ConvolutionalMatlab
         self.cached_input = Some(x.clone());
         b
     }
+    pub fn k1_back(&mut self, delta_c_p: &ImageData) -> Array4<f32> {
 
-    pub fn map_conv_boundary(kernel_length: i32) -> (i32, i32) {
-        let upper = kernel_length / 2;
-        (-upper,upper)
+        let cached_data = self.cached_input.as_ref().unwrap();
+        let (new_r, new_c) = cached_data.get_image_size_after_convolution_image_data(delta_c_p);
+        let mut new_kernel =Array4::zeros([self.kernel.get_input_channel_number(), self.kernel.get_output_channel_number(), new_r, new_c]);
+        assert_eq!(new_kernel.shape(), self.kernel.get_shape());
+        let i_180 = self.cached_input.as_ref().unwrap().rot180();
+        for p_output_idx in 0..self.kernel.get_output_channel_number(){
+            for input_idx in 0..self.kernel.get_input_channel_number(){ //should be 1
+                let sub_image = i_180.get_image(input_idx);
+                let sub_kernel = delta_c_p.get_image(input_idx);
+                let a = Self::conv2d(&sub_image, &sub_kernel);
+                new_kernel.slice_mut(s![input_idx, p_output_idx ,..,..]).assign(&a)
+            }
+        }
+        let a = self.alpha * &new_kernel;
+        self.kernel.subtract(&a);
+        new_kernel
     }
+
     pub fn conv2d(data: &ArrayView2<f32>, kernel: &ArrayView2<f32>) -> Array2<f32> {
         let new_row = data.shape()[0] - kernel.shape()[0] + 1;
         let new_col = data.shape()[1] - kernel.shape()[1] + 1;
@@ -72,46 +173,44 @@ impl ConvolutionalMatlab
         }
         return_data
     }
-    pub fn conv(x: &Array3<f32>, kernel: &Array4<f32>) -> ArrayBase<OwnedRepr<f32>, Ix3> {
-        let mut c1 = Array3::zeros((
-            kernel.shape()[1],
-            x.shape()[1] - kernel.shape()[2] + 1,
-            x.shape()[2] - kernel.shape()[3] + 1
-        )
-        );
-        for kernel_idx in 0..kernel.shape()[0] {
-            for row in 0..c1.shape()[1] {
-                for col in 0..c1.shape()[2] {
-                    let value = x.slice(
-                        s![kernel_idx,
-                            row..row+kernel.shape()[2],
-                            col..col+kernel.shape()[3]]
-                    );
-                    let sum = (&value * kernel).sum();
-                    c1[[kernel_idx, row, col]] = sum;
-                }
-            }
-        }
-        c1
-    }
-    pub fn k1_back(&mut self, delta_c_x: &Array3<f32>) -> ArrayBase<OwnedRepr<f32>, Ix3> {
-        let input = self.cached_input.as_ref().unwrap();
-        let mut rot180 = Self::rot180(input);
-        let delta_k = Array3::zeros((rot180.shape()[0], rot180.shape()[1], rot180.shape()[2]));
-        for kernel in 0..rot180.shape()[0] {
-            let rot = rot180.slice(s![kernel, ..,..]);
-            let delta_c = delta_c_x.slice(s![kernel, ..,..]);
-            let t = Self::conv2d(&rot, &delta_c);
-            rot180
-                .slice_mut(s![kernel,..,..])
-                .assign(&t);
-        }
-        self.kernel = &self.kernel - self.alpha * &delta_k;
-        delta_k
-    }
-    fn rot180(kernel: &Array3<f32>) -> Array3<f32> {
-        kernel.slice(s![.., ..;-1, ..;-1]).to_owned()
-    }    // fn convolution(x: &Array3<f32>, kernel: &Array4<f32>, biases: &Array1<f32>) -> Array3<f32>
+    // pub fn conv(x: &Array3<f32>, kernel: &Array4<f32>) -> ArrayBase<OwnedRepr<f32>, Ix3> {
+    //     let mut c1 = Array3::zeros((
+    //         kernel.shape()[1],
+    //         x.shape()[1] - kernel.shape()[2] + 1,
+    //         x.shape()[2] - kernel.shape()[3] + 1
+    //     )
+    //     );
+    //     for kernel_idx in 0..kernel.shape()[0] {
+    //         for row in 0..c1.shape()[1] {
+    //             for col in 0..c1.shape()[2] {
+    //                 let value = x.slice(
+    //                     s![kernel_idx,
+    //                         row..row+kernel.shape()[2],
+    //                         col..col+kernel.shape()[3]]
+    //                 );
+    //                 let sum = (&value * kernel).sum();
+    //                 c1[[kernel_idx, row, col]] = sum;
+    //             }
+    //         }
+    //     }
+    //     c1
+    // }
+    // pub fn k1_back(&mut self, delta_c_x: &Array3<f32>) -> ArrayBase<OwnedRepr<f32>, Ix3> {
+    //     let input = self.cached_input.as_ref().unwrap();
+    //     let mut rot180 = Self::rot180(input);
+    //     let delta_k = Array3::zeros((rot180.shape()[0], rot180.shape()[1], rot180.shape()[2]));
+    //     for kernel in 0..rot180.shape()[0] {
+    //         let rot = rot180.slice(s![kernel, ..,..]);
+    //         let delta_c = delta_c_x.slice(s![kernel, ..,..]);
+    //         let t = Self::conv2d(&rot, &delta_c);
+    //         rot180
+    //             .slice_mut(s![kernel,..,..])
+    //             .assign(&t);
+    //     }
+    //     self.kernel = &self.kernel - self.alpha * &delta_k;
+    //     delta_k
+    // }
+    // fn convolution(x: &Array3<f32>, kernel: &Array4<f32>, biases: &Array1<f32>) -> Array3<f32>
 
     // {
     //     let k_rows = kernel.shape()[2];
@@ -162,12 +261,35 @@ impl ConvolutionalMatlab
 
 #[cfg(test)]
 mod tests {
-    use crate::train::loss_functions::{cross_entropy_loss};
-    use approx::assert_abs_diff_eq;
     use ndarray::{array, s, Array, Array1, Array2, Array3, Array4, ArrayView2};
     use crate::train::activation::ReluActivation;
-    use crate::train::convolutional_matlab::{ConvolutionalMatlab, ALPHA};
+    use crate::train::convolutional_matlab::{ConvolutionalMatlab, ImageData, ALPHA};
     use crate::util::mnist_helper::load_mnist;
+
+    #[test]
+    pub fn c1_test()
+    {
+        let kernel: Array4<f32> = {
+            let mut k = Array4::zeros((1, 6, 5, 5));
+            k.slice_mut(s![.., .., 2, 2]).fill(1.0);
+            k
+        };
+        let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
+
+        let first = x.row(0); //.unwrap();
+        let input_image: Array3<f32> = first.into_shape_with_order((1, 28,28))
+            .unwrap()
+            .to_owned();
+        let imageData = ImageData::new(input_image);
+        let mut sut = ConvolutionalMatlab::new(kernel, 0.0001);
+        let f_res = sut.k1(&imageData);
+        assert_eq!(f_res.shape(), [6,24,24]);
+
+        let f = &ImageData::new(f_res);
+        let r = sut.k1_back(&f);
+        assert_eq!(r.shape(), [1,6,5,5]);
+    }
+
     #[test]
     pub fn c1_back_prop_test()
     {
@@ -190,6 +312,7 @@ mod tests {
             .unwrap()
             .to_owned();
 
+        let a = ImageData::new(a);
         let res = sut.k1(&a);
         let y :Array3<f32> = Array3::ones((1,24,24)) * 250.;
         for _ in 0..100{
@@ -224,12 +347,13 @@ mod tests {
             .unwrap()
             .to_owned();
 
+        let a = ImageData::new(a);
         let res = sut.k1(&a);
 
-        let aslice: &ArrayView2<f32> = &a.slice(s![0, 1..25,1..25]);
+        let aslice: &ArrayView2<f32> = &a.image.slice(s![0, 1..25,1..25]);
         let ressss: &ArrayView2<f32> = &res.slice(s![0,..,..]);
 
-        let final_res = &a.slice(s![0, 16, 2..26]);
+        let final_res = &a.image.slice(s![0, 16, 2..26]);
         let final_res2 = &ressss.row(14);
         assert_eq!(&final_res, &final_res2);
         //    assert_eq!(&aslice.shape(), &ressss.shape());
@@ -246,7 +370,7 @@ mod tests {
         let a: Array3<f32> = first.into_shape_with_order((1, 28,28))
             .unwrap()
             .to_owned();
-        let res = sut.k1(&a);
+        let res = sut.k1(&ImageData::new(a));
         assert_eq!(res.shape(), &[6, 24, 24]);
     }
 
