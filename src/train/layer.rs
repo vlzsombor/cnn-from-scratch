@@ -164,6 +164,17 @@ mod tests {
     use ndarray::array;
 
     #[test]
+    fn test_neural_layer_seeded_reproducible2() {
+        let layer1 = Layer::new(3, 4, 0.001);
+        assert_eq!(layer1.weights.shape(), &[3, 4]);
+        let mut nnlayer1 = Layer::new_deterministic(2, 2, None, 0.001);
+        let input: Array2<f32> = Array2::from(vec![[4.0, 2.0], [3.0, 2.0]]);
+        let res = nnlayer1.forward(&input);
+        let res = nnlayer1.backward_propagation(&input);
+        let expected :Array2<f32>= array! [[0.97810096, 5.3549976], [0.50011975, 4.020927]];
+        assert_abs_diff_eq!(&res, &expected, epsilon = 1e-4);
+    }
+    #[test]
     fn test_neural_layer_seeded_reproducible() {
         let layer1 = Layer::new(3, 4, 0.001);
         assert_eq!(layer1.weights.shape(), &[3, 4]);
