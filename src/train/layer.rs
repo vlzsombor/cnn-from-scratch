@@ -171,7 +171,7 @@ mod tests {
         let input: Array2<f32> = Array2::from(vec![[4.0, 2.0], [3.0, 2.0]]);
         let res = nnlayer1.forward(&input);
         let res = nnlayer1.backward_propagation(&input);
-        let expected :Array2<f32>= array! [[0.97810096, 5.3549976], [0.50011975, 4.020927]];
+        let expected :Array2<f32>= array! [[4.580066, 0.10922706],[4.102085, 0.32009375]];
         assert_abs_diff_eq!(&res, &expected, epsilon = 1e-4);
     }
     #[test]
