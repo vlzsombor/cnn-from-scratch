@@ -1,10 +1,7 @@
-﻿use std::fmt::{Debug, Formatter};
-use std::ops::Range;
-use image::codecs::png::CompressionType::Default;
-use ndarray::{array, s, Array, Array1, Array2, Array3, Array4, ArrayBase, ArrayD, ArrayView2, ArrayView3, Axis, Ix3, OwnedRepr};
-use crate::train::activation::ReluActivation;
+﻿use crate::train::activation::ReluActivation;
 use crate::train::layerable::Layerable;
-use pipe::pipe;
+use ndarray::{s, Array1, Array2, Array3, Array4, ArrayView2};
+use std::fmt::Debug;
 pub const ALPHA: f32 = 0.00001;
 
 #[derive(Debug, Clone)]
@@ -107,7 +104,7 @@ impl ConvolutionalMatlab
     pub fn new(kernel: Array4<f32>, alpha: f32) -> Self
     {
         let k = Kernel::new(kernel);
-        let biases = Array1::zeros(k.get_input_channel_number());// bug in channels should be out channels
+        let biases = Array1::zeros(k.get_output_channel_number());// bug in channels should be out channels
         ConvolutionalMatlab
         {
             kernel: k,
@@ -116,11 +113,11 @@ impl ConvolutionalMatlab
             cached_input: None
         }
     }
-    pub fn k1_sigma(&mut self, x: &ImageData) -> Array3<f32>
+    pub fn forward_activation(&mut self, x: &ImageData) -> Array3<f32>
     {
-        self.k1(x).get_sigmoid()
+        self.forward(x).get_sigmoid()
     }
-    pub fn k1(&mut self, x: &ImageData) -> Array3<f32>
+    pub fn forward(&mut self, x: &ImageData) -> Array3<f32>
     {
         assert_eq!(x.get_channel_number(), self.kernel.get_input_channel_number());
         let (new_row, new_col) = x.get_image_size_after_convolution(&self.kernel);
@@ -133,13 +130,15 @@ impl ConvolutionalMatlab
                 let r =  Self::conv2d(&sub_x, &sub_k);
                 acc = r + acc;
             }
+            acc = acc + self.biases[output_index];
             return_res
                 .slice_mut(s![output_index, ..,..])
                 .assign(&acc);
         }
-        let b = return_res + &self.biases;
+        // dbg!(&self.biases.shape(),&return_res.shape());
+        // let b = return_res + &self.biases;
         self.cached_input = Some(x.clone());
-        b
+        return_res
     }
     pub fn k1_back(&mut self, delta_c_p: &ImageData) {
         let grad = self.compute_kernel_gradient(delta_c_p);
@@ -183,114 +182,18 @@ impl ConvolutionalMatlab
         }
         return_data
     }
-    // pub fn conv(x: &Array3<f32>, kernel: &Array4<f32>) -> ArrayBase<OwnedRepr<f32>, Ix3> {
-    //     let mut c1 = Array3::zeros((
-    //         kernel.shape()[1],
-    //         x.shape()[1] - kernel.shape()[2] + 1,
-    //         x.shape()[2] - kernel.shape()[3] + 1
-    //     )
-    //     );
-    //     for kernel_idx in 0..kernel.shape()[0] {
-    //         for row in 0..c1.shape()[1] {
-    //             for col in 0..c1.shape()[2] {
-    //                 let value = x.slice(
-    //                     s![kernel_idx,
-    //                         row..row+kernel.shape()[2],
-    //                         col..col+kernel.shape()[3]]
-    //                 );
-    //                 let sum = (&value * kernel).sum();
-    //                 c1[[kernel_idx, row, col]] = sum;
-    //             }
-    //         }
-    //     }
-    //     c1
-    // }
-    // pub fn k1_back(&mut self, delta_c_x: &Array3<f32>) -> ArrayBase<OwnedRepr<f32>, Ix3> {
-    //     let input = self.cached_input.as_ref().unwrap();
-    //     let mut rot180 = Self::rot180(input);
-    //     let delta_k = Array3::zeros((rot180.shape()[0], rot180.shape()[1], rot180.shape()[2]));
-    //     for kernel in 0..rot180.shape()[0] {
-    //         let rot = rot180.slice(s![kernel, ..,..]);
-    //         let delta_c = delta_c_x.slice(s![kernel, ..,..]);
-    //         let t = Self::conv2d(&rot, &delta_c);
-    //         rot180
-    //             .slice_mut(s![kernel,..,..])
-    //             .assign(&t);
-    //     }
-    //     self.kernel = &self.kernel - self.alpha * &delta_k;
-    //     delta_k
-    // }
-    // fn convolution(x: &Array3<f32>, kernel: &Array4<f32>, biases: &Array1<f32>) -> Array3<f32>
-
-    // {
-    //     let k_rows = kernel.shape()[2];
-    //     let k_cols = kernel.shape()[3];
-    //     let mut c1_result = Array3::zeros((
-    //         kernel.shape()[0],
-    //         x.shape()[1] - k_rows + 1,
-    //         x.shape()[2] - k_cols + 1)
-    //     );
-    //     for kernel_idx in 0..c1_result.shape()[0]{
-    //         for row_idx in 0..c1_result.shape()[1]
-    //         {
-    //             for col_idx in 0..c1_result.shape()[2]
-    //             {
-    //                 let sub_x: ArrayView2<f32> =
-    //                     x.slice(s!
-    //                     [
-    //                         kernel_idx,
-    //                         row_idx..row_idx+k_rows,
-    //                         col_idx..col_idx+k_cols
-    //                     ]
-    //                     );
-    //                 let res = &sub_x * &kernel.slice(s![kernel_idx, .., .., ..]);
-    //                 c1_result[[kernel_idx, row_idx, col_idx]] = res.sum() + biases[kernel_idx];
-    //             }
-    //         }
-    //     }
-    //     let c1_result = c1_result.get_relu();
-    //     c1_result
-    // }
 }
-
-// impl Layerable for ConvolutionalMatlab
-// {
-//     fn forward(&mut self, x: &Array2<f32>) -> Array2<f32> {
-//         let res = self.k1(x);
-//
-//         res
-//     }
-
-
-
-//     fn backward_propagation(&mut self, dc_da: &Array2<f32>) -> Array2<f32> {
-//         todo!()
-//     }
-// }
-
-
 #[cfg(test)]
 mod tests {
-    use std::process::id;
-    use ndarray::{array, s, Array, Array1, Array2, Array3, Array4, ArrayBase, ArrayView2};
     use crate::train::activation::ReluActivation;
     use crate::train::convolutional_matlab::{ConvolutionalMatlab, ImageData, ALPHA};
     use crate::util::mnist_helper::load_mnist;
-    // let eps = 1e-4_f32;
-    // kernel[p, 0, u, v] += eps → forward → loss_plus
-    // kernel[p, 0, u, v] -= 2*eps → forward → loss_minus
-    // numerical_grad = (loss_plus - loss_minus) / (2.0 * eps)
-    // analytical_grad = ∆k aus backward()
-    // assert: (numerical_grad - analytical_grad).abs() < 1e-3
-
+    use ndarray::{array, s, Array1, Array2, Array3, Array4, ArrayView2};
+    #[test]
+    pub fn c1_gradient_check2() {}
 
     #[test]
-    pub fn c1_gradient_check2(){
-
-    }
-
-    #[test]
-    pub fn c1_gradient_check(){
+    pub fn c1_gradient_check() {
         let epsilon = 1e-3_f32;
         let kernel: Array4<f32> = {
             let mut k = Array4::zeros((1, 6, 5, 5));
@@ -299,26 +202,24 @@ mod tests {
         };
         let (x, _y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
         let input_image: Array3<f32> = x.row(0)
-            .into_shape_with_order((1, 28, 28)).unwrap().mapv(|x| x/255.).to_owned();
+            .into_shape_with_order((1, 28, 28)).unwrap().mapv(|x| x / 255.).to_owned();
         let image_data = ImageData::new(input_image);
         let target: Array3<f32> = Array3::ones((6, 24, 24));
 
         let mut sut = ConvolutionalMatlab::new(kernel, ALPHA);
 
-        // --- Analytischer Gradient ---
-        let output = sut.k1(&image_data);              // cacht input
+        let output = sut.forward(&image_data);              // cacht input
         let grad_output = &output - &target;           // ∂L/∂output, [6,24,24]
         let delta = ImageData::new(grad_output.clone());
         let analytical_grad: Array4<f32> = sut.compute_kernel_gradient(&delta);
 
-        // --- Numerischer Gradient (für einen Eintrag: kernel[0,0,2,2]) ---
         let mut sut_plus = ConvolutionalMatlab::new({
                                                         let mut k = Array4::zeros((1, 6, 5, 5));
                                                         k.slice_mut(s![.., .., 2, 2]).fill(1.0);
                                                         k[[0, 0, 2, 2]] += epsilon;
                                                         k
                                                     }, ALPHA);
-        let out_plus = sut_plus.k1(&image_data);
+        let out_plus = sut_plus.forward(&image_data);
         let loss_plus = ConvolutionalMatlab::compute_mse(
             &out_plus, &target
         );
@@ -329,7 +230,7 @@ mod tests {
                                                          k[[0, 0, 2, 2]] -= epsilon;
                                                          k
                                                      }, ALPHA);
-        let out_minus = sut_minus.k1(&image_data);
+        let out_minus = sut_minus.forward(&image_data);
         let loss_minus = ConvolutionalMatlab::compute_mse(
             &out_minus, &target
         );
@@ -341,7 +242,6 @@ mod tests {
         let relative_error = (analytic - numerical_grad).abs() / analytic.abs().max(numerical_grad.abs());
         assert!(relative_error < 1e-3,
                 "Gradient check failed: {numerical_grad} vs {analytic} relative: {relative_error}");
-
     }
 
     #[test]
@@ -355,17 +255,17 @@ mod tests {
         let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
 
         let first = x.row(0); //.unwrap();
-        let input_image: Array3<f32> = first.into_shape_with_order((1, 28,28))
+        let input_image: Array3<f32> = first.into_shape_with_order((1, 28, 28))
             .unwrap()
             .to_owned();
         let imageData = ImageData::new(input_image);
         let mut sut = ConvolutionalMatlab::new(kernel, 0.0001);
-        let f_res = sut.k1(&imageData);
-        assert_eq!(f_res.shape(), [6,24,24]);
+        let f_res = sut.forward(&imageData);
+        assert_eq!(f_res.shape(), [6, 24, 24]);
 
         let f = &ImageData::new(f_res);
         let r = sut.compute_kernel_gradient(&f);
-        assert_eq!(r.shape(), [1,6,5,5]);
+        assert_eq!(r.shape(), [1, 6, 5, 5]);
     }
 
     #[test]
@@ -385,22 +285,20 @@ mod tests {
         let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
 
         let first = x.row(0); //.unwrap();
-        let a: Array3<f32> = first.into_shape_with_order((1, 28,28))
+        let a: Array3<f32> = first.into_shape_with_order((1, 28, 28))
             .unwrap()
             .to_owned();
 
         let a = ImageData::new(a);
-        let res = sut.k1(&a);
-        let y :Array3<f32> = Array3::ones((1,24,24)) * 250.;
-        for _ in 0..100{
-            let y_hat = sut.k1(&a);
+        let res = sut.forward(&a);
+        let y: Array3<f32> = Array3::ones((1, 24, 24)) * 250.;
+        for _ in 0..100 {
+            let y_hat = sut.forward(&a);
             let delta_y_hat = (&y_hat - &y) * &y_hat.get_sigmoid_derivative();
-//            let res = sut.k1_back(&delta_y_hat);
+            //            let res = sut.k1_back(&delta_y_hat);
 
- //           let dummy_loss = res.mapv(|x| x.powi(2)).sum();
+            //           let dummy_loss = res.mapv(|x| x.powi(2)).sum();
         }
-
-
     }
     #[test]
     pub fn c1_size_test2()
@@ -419,12 +317,12 @@ mod tests {
         let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
 
         let first = x.row(0); //.unwrap();
-        let a: Array3<f32> = first.into_shape_with_order((1, 28,28))
+        let a: Array3<f32> = first.into_shape_with_order((1, 28, 28))
             .unwrap()
             .to_owned();
 
         let a = ImageData::new(a);
-        let res = sut.k1(&a);
+        let res = sut.forward(&a);
 
         let aslice: &ArrayView2<f32> = &a.image.slice(s![0, 1..25,1..25]);
         let ressss: &ArrayView2<f32> = &res.slice(s![0,..,..]);
@@ -438,19 +336,19 @@ mod tests {
     #[test]
     pub fn c1_size_test()
     {
-        let kernel: Array4<f32> = Array4::ones((1,6,5,5));
+        let kernel: Array4<f32> = Array4::ones((1, 6, 5, 5));
         let mut sut = ConvolutionalMatlab::new(kernel, ALPHA);
         let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
         let first = x.row(0); //.unwrap();
-        let a: Array3<f32> = first.into_shape_with_order((1, 28,28))
+        let a: Array3<f32> = first.into_shape_with_order((1, 28, 28))
             .unwrap()
             .to_owned();
-        let res = sut.k1(&ImageData::new(a));
+        let res = sut.forward(&ImageData::new(a));
         assert_eq!(res.shape(), &[6, 24, 24]);
     }
 
     #[test]
-    pub fn conv2d_test(){
+    pub fn conv2d_test() {
         let kernel: Array2<f32> = array![
                 [0.0,0.0,0.0,0.0,0.0],
                 [0.0,0.0,0.0,0.0,0.0],
@@ -462,11 +360,11 @@ mod tests {
         let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
 
         let first = x.row(0); //.unwrap();
-        let a: Array2<f32> = first.into_shape_with_order((28,28))
+        let a: Array2<f32> = first.into_shape_with_order((28, 28))
             .unwrap()
             .to_owned();
 
-        let res = ConvolutionalMatlab::conv2d(&a.view(),&kernel.view());
+        let res = ConvolutionalMatlab::conv2d(&a.view(), &kernel.view());
 
         let aslice: &ArrayView2<f32> = &a.slice(s![1..25,1..25]);
         let ressss: &ArrayView2<f32> = &res.slice(s![..,..]);
@@ -478,48 +376,47 @@ mod tests {
         assert_eq!(&aslice.row(0), &ressss.row(0));
     }
     #[test]
-    pub fn backward_output_dimension(){
-
+    pub fn backward_output_dimension() {
         let epsilon = 1e-3_f32;
         let alpha = 1.;
         let kernel: Array4<f32> = {
-            let mut k = Array4::zeros((1,3,3,3));
+            let mut k = Array4::zeros((1, 3, 3, 3));
             k.slice_mut(s![..,..,1,1]).fill(1.0);
             k
         };
         //1 5x5
-        let input_image_raw: Array3<f32> = Array3::ones((1,5,5)) * 0.1;
+        let input_image_raw: Array3<f32> = Array3::ones((1, 5, 5)) * 0.1;
         let input_image = ImageData::new(input_image_raw);
 
-        let target_image_raw: Array3<f32> = Array3::ones((3,3,3)) * 0.5;
+        let target_image_raw: Array3<f32> = Array3::ones((3, 3, 3)) * 0.5;
         let target_image = ImageData::new(target_image_raw);
         let mut sut = ConvolutionalMatlab::new(kernel.clone(), alpha);
-        sut.k1(&input_image);
+        sut.forward(&input_image);
         let backward = sut.compute_kernel_gradient(&target_image);
         assert_eq!(backward.raw_dim(), kernel.raw_dim());
     }
     #[test]
-    pub fn gradient_check_dummy_cnn(){
+    pub fn gradient_check_dummy_cnn() {
         //Test model: kernel 2,1,3x3
         let epsilon = 1e-3_f32;
         let alpha = 1.;
         let kernel: Array4<f32> = {
-            let mut k = Array4::zeros((1,3,3,3));
+            let mut k = Array4::zeros((1, 3, 3, 3));
             k.slice_mut(s![..,..,1,1]).fill(1.0);
             k
         };
         //1 5x5
-        let input_image_raw: Array3<f32> = Array3::ones((1,5,5)) * 0.1;
+        let input_image_raw: Array3<f32> = Array3::ones((1, 5, 5)) * 0.1;
         let input_image = ImageData::new(input_image_raw);
 
-        let target_image_raw: Array3<f32> = Array3::ones((3,3,3)) * 0.5;
+        let target_image_raw: Array3<f32> = Array3::ones((3, 3, 3)) * 0.5;
         let target_image = ImageData::new(target_image_raw);
-        let size= (&kernel.clone()).shape()[2];
-        let in_size= (&kernel.clone()).shape()[0];
-        let out_size= (&kernel.clone()).shape()[1];
+        let size = (&kernel.clone()).shape()[2];
+        let in_size = (&kernel.clone()).shape()[0];
+        let out_size = (&kernel.clone()).shape()[1];
         let mut i = 0;
         let mut sut = ConvolutionalMatlab::new(kernel.clone(), alpha);
-        let f = sut.k1(&input_image);
+        let f = sut.forward(&input_image);
 
         let delta = &f - &target_image.image;
         let analytic = sut.compute_kernel_gradient(&ImageData::new(delta));
@@ -528,7 +425,7 @@ mod tests {
                 for row in 0..size {
                     for col in 0..size {
                         let kernel = kernel.clone();
-                        let idx = (inp,out,row,col);
+                        let idx = (inp, out, row, col);
                         let mut sut_plus = ConvolutionalMatlab::new({
                                                                         let mut k = kernel.clone();
                                                                         k[idx] += epsilon;
@@ -541,8 +438,8 @@ mod tests {
                                                                          k
                                                                      }, alpha);
 
-                        let f_plus = sut_plus.k1(&input_image);
-                        let f_minus = sut_minus.k1(&input_image);
+                        let f_plus = sut_plus.forward(&input_image);
+                        let f_minus = sut_minus.forward(&input_image);
                         let loss_plus = ConvolutionalMatlab::compute_mse(
                             &f_plus, &target_image.image
                         );
@@ -552,7 +449,7 @@ mod tests {
                         let numeric_grad = (loss_plus - loss_minus) / (2. * epsilon);
 
 
-                        let analytic_grad= analytic[idx];
+                        let analytic_grad = analytic[idx];
                         let relative_error = (&analytic_grad - &numeric_grad).abs() / &analytic_grad.abs().max(numeric_grad.abs());
                         assert!(relative_error < 1e-3,
                                 "Gradient check failed: {analytic_grad} vs {numeric_grad} relative: {relative_error}");
