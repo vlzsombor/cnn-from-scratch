@@ -2,90 +2,12 @@
 use crate::train::layerable::Layerable;
 use ndarray::{s, Array1, Array2, Array3, Array4, ArrayView2};
 use std::fmt::Debug;
+use crate::train::convolutional::CnnLayerable::CnnLayerable;
+use crate::train::convolutional::ImageData::ImageData;
+use crate::train::convolutional::Kernel::Kernel;
+
 pub const ALPHA: f32 = 0.00001;
 
-#[derive(Debug, Clone)]
-pub struct ImageData {
-    pub image: Array3<f32>
-}
-impl ImageData{
-    pub fn new(image: Array3<f32>) -> Self{
-        ImageData{
-            image
-        }
-    }
-    pub fn get_channel_number(&self) -> usize {
-        self.image.shape()[0]
-    }
-    pub fn get_row(&self) -> usize {
-        self.image.shape()[1]
-    }
-    pub fn get_col(&self) -> usize {
-        self.image.shape()[2]
-    }
-    pub fn get_image(&self, channel_number: usize) -> ArrayView2<f32>{
-        self.image.slice(s![channel_number, .., ..])
-    }
-
-    pub fn rot180(&self) -> Self {
-        Self::new(self.image.slice(s![.., ..;-1, ..;-1]).to_owned())
-    }
-
-    pub fn get_new_temp_array(&self, kernel: &Kernel) -> Array3<f32> {
-        let (new_r, new_c) = self.get_image_size_after_convolution(kernel);
-        Array3::zeros([kernel.get_output_channel_number(), new_r, new_c])
-    }
-
-    pub fn get_image_size_after_convolution_image_data(&self, image_data: &ImageData) -> (usize, usize) {
-        (self.get_row() - image_data.get_row() + 1, self.get_col() - image_data.get_col() + 1)
-    }
-    pub fn get_image_size_after_convolution(&self, kernel: &Kernel) -> (usize, usize) {
-        (self.get_row() - kernel.get_row() + 1, self.get_col() - kernel.get_col() + 1)
-    }
-}
-#[derive(Debug)]
-pub struct Kernel{
-    kernel: Array4<f32>
-}
-
-impl Kernel{
-
-    pub fn subtract(&mut self, kernel2: &Array4<f32>){
-        self.kernel = &self.kernel - kernel2;
-    }
-    pub fn get_new_temp_array(&self, imageData: &ImageData) -> Array4<f32> {
-        let (new_r, new_c) = imageData.get_image_size_after_convolution(&self);
-        dbg!(imageData.get_row(), imageData.get_col());
-        dbg!(self.get_row(), self.get_col());
-        Array4::zeros([self.get_input_channel_number(), self.get_output_channel_number(), new_r, new_c])
-        //Array3::zeros([kernel.get_output_channel_number(), new_r, new_c])
-    }
-    pub fn get_shape(&self) -> &[usize] {
-        self.kernel.shape()
-    }
-    pub fn get_row(&self) -> usize {
-        self.kernel.shape()[2]
-    }
-    pub fn get_col(&self) -> usize {
-        self.kernel.shape()[3]
-    }
-    pub fn get_image(&self, input: usize, output: usize) -> ArrayView2<f32>{
-        self.kernel.slice(s![input, output, .., ..])
-    }
-    pub fn get_input_channel_number(&self) -> usize {
-        self.kernel.shape()[0]
-    }
-    pub fn get_output_channel_number(&self) -> usize {
-        self.kernel.shape()[1]
-    }
-
-    pub fn new(kernel: Array4<f32>) -> Self
-    {
-        Kernel{
-            kernel
-        }
-    }
-}
 #[derive(Debug)]
 pub struct ConvolutionalMatlab
 {
@@ -94,7 +16,14 @@ pub struct ConvolutionalMatlab
     alpha: f32,
     cached_input: Option<ImageData>
 }
-
+impl CnnLayerable for ConvolutionalMatlab{
+    fn forward_propagation(&mut self, x: &ImageData) -> Array3<f32> {
+        self.forward(x)
+    }
+    fn backward_propagation(&mut self, delta_c: &ImageData) -> Array3<f32> {
+        self.backpropagation(delta_c)
+    }
+}
 impl ConvolutionalMatlab
 {
     pub fn compute_mse(output: &Array3<f32>, target: &Array3<f32>) -> f32 {
@@ -113,6 +42,7 @@ impl ConvolutionalMatlab
             cached_input: None
         }
     }
+    #[deprecated]
     pub fn forward_activation(&mut self, x: &ImageData) -> Array3<f32>
     {
         self.forward(x).get_sigmoid()
@@ -135,14 +65,46 @@ impl ConvolutionalMatlab
                 .slice_mut(s![output_index, ..,..])
                 .assign(&acc);
         }
-        // dbg!(&self.biases.shape(),&return_res.shape());
-        // let b = return_res + &self.biases;
         self.cached_input = Some(x.clone());
         return_res
     }
-    pub fn k1_back(&mut self, delta_c_p: &ImageData) {
+    //todo rethink
+    pub fn compute_input_gradient(&self, delta: &ImageData) -> Array3<f32> {
+        let pad = self.kernel.get_col() + 1;
+        let in_ch = self.kernel.get_input_channel_number();
+        let out_ch = self.kernel.get_output_channel_number();
+        let k_h = self.kernel.get_row();
+        let k_w = self.kernel.get_col();
+
+        let delta_h = delta.image.shape()[1] + 2 * pad;
+        let delta_w = delta.image.shape()[1] + 2 * pad;
+        let out_h = delta_h - k_h + 1;
+        let out_w = delta_w - k_w + 1;
+
+        let mut result: Array3<f32> = Array3::zeros([in_ch, out_h, out_w]);
+
+        for in_idx in 0..in_ch{
+            let mut acc: Array2<f32> = Array2::zeros((out_h, out_w));
+            for out_idx in 0..out_ch {
+                let k_slice = self.kernel.get_image(in_idx, out_idx);
+
+                let d_slice = delta.get_image(out_idx);
+                let mut padded: Array2<f32> = Array2::zeros((d_slice.shape()[0] + 2*pad, d_slice.shape()[1] + 2*pad));
+                padded
+                    .slice_mut(s![pad..pad+d_slice.shape()[0], pad..pad+d_slice.shape()[1]])
+                    .assign(&d_slice);
+
+                acc = acc + Self::conv2d(&padded.view(), &k_slice.view());
+            }
+            result.slice_mut(s![in_idx,.. ,..]).assign(&acc);
+        }
+        result
+    }
+    pub fn backpropagation(&mut self, delta_c_p: &ImageData) -> Array3<f32> {
         let grad = self.compute_kernel_gradient(delta_c_p);
+        let delta_x = self.compute_input_gradient(delta_c_p);
         self.apply_kernel_update(&grad);
+        delta_x
     }
     pub fn compute_kernel_gradient(&self, delta_c_p: &ImageData) -> Array4<f32> {
         let (new_r, new_c) = self.cached_input.as_ref().unwrap()
@@ -186,11 +148,9 @@ impl ConvolutionalMatlab
 #[cfg(test)]
 mod tests {
     use crate::train::activation::ReluActivation;
-    use crate::train::convolutional_matlab::{ConvolutionalMatlab, ImageData, ALPHA};
+    use crate::train::convolutional::convolutional_matlab::{ConvolutionalMatlab, ImageData, ALPHA};
     use crate::util::mnist_helper::load_mnist;
     use ndarray::{array, s, Array1, Array2, Array3, Array4, ArrayView2};
-    #[test]
-    pub fn c1_gradient_check2() {}
 
     #[test]
     pub fn c1_gradient_check() {

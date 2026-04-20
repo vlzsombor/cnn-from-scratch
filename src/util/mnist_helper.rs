@@ -6,8 +6,8 @@ use ndarray::{s, Array1, Array2};
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use crate::train::convolutional_layer;
-use crate::train::convolutional_layer::ConvolutionalLayer;
+use crate::train::convolutional::convolutional_layer;
+use crate::train::convolutional::convolutional_layer::ConvolutionalLayer;
 
 pub fn load_mnist(path: &str) -> Result<(Array2<f32>, Array1<f32>), Box<dyn Error>> {
     let file = File::open(path)?;

@@ -42,6 +42,7 @@ pub trait ReluActivation {
     fn get_relu(&self) -> Self::Output;
     fn get_sigmoid(&self) -> Self::Output;
     fn get_sigmoid_derivative(&self) -> Self::Output;
+    fn sigmoid_derivative_from_activation(&self) -> Self::Output;
 }
 impl<D, S, A> ReluActivation for ArrayBase<S, D>
 where
@@ -68,7 +69,9 @@ where
             s * (A::one() -s)
         })
     }
-
+    fn sigmoid_derivative_from_activation(&self) -> Array<A, D> {
+        self.mapv(|s| s * (A::one() - s))
+    }
 }
 
 pub fn relu_generic<D,S>(array: &ArrayBase<S, D>) -> Array<f32, D>
