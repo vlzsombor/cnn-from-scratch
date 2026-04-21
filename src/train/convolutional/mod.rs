@@ -3,5 +3,6 @@ pub mod convolutional_matlab;
 mod ImageData;
 mod Kernel;
 mod CnnLayerable;
-mod ConvolutionalContainer;
+mod CnnContainer;
 mod CnnSigmoidActivation;
+mod CnnPoolingLayer;
