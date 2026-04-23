@@ -1,4 +1,5 @@
-﻿use crate::train::layer::Layer;
+﻿use std::num::FpCategory::Nan;
+use crate::train::layer::Layer;
 use crate::train::layerable::Layerable;
 use crate::train::loss_functions::{softmax, EPSILON};
 use ndarray::Array2;
@@ -47,26 +48,32 @@ impl LayerContainer {
                 layer.forward(&acc)
             })
     }
-    pub fn backward_propagation(&mut self, dc_da: Array2<f32>) {
-        self.layers
+    pub fn backward_propagation(&mut self, dc_da: Array2<f32>) -> Array2<f32> {
+        let r = self.layers
             .iter_mut()
             .rev()
             .fold(dc_da, |acc, item|{
             item.backward_propagation(&acc)
         });
+        r
     }
 }
 
 
 pub fn loss(y_hat: &Array2<f32>, y: &Array2<f32>) -> f32 {
-    1.0 / (y_hat.nrows() as f32) * ((y - y_hat) * (y - y_hat)).sum()
+    let r = 1.0 / (y_hat.nrows() as f32) * ((y - y_hat) * (y - y_hat)).sum();
+    if(r.is_nan()){
+        dbg!(&y_hat, &y, r);
+        println!("")
+    }
+    r
 }
 
 pub fn mse_loss_derivative(y_hat: &Array2<f32>, y: &Array2<f32>) -> Array2<f32> {
     2.0 / (y_hat.nrows() as f32) * (y_hat - y)
 }
 
-pub fn cross_entropy_loss_and_softmax(y_hat: &Array2<f32>, y: &Array2<f32>) -> Array2<f32> {
+pub fn cross_entropy_loss_derivative_and_softmax(y_hat: &Array2<f32>, y: &Array2<f32>) -> Array2<f32> {
     let softmax = softmax(y_hat.view());
     softmax - y
 }
@@ -79,7 +86,7 @@ pub fn cross_entropy_loss(y_hat: &Array2<f32>, y: &Array2<f32>) -> f32 {
 #[cfg(test)]
 mod tests {
     use crate::train::layer::{ActivationLayer, Layer};
-    use crate::train::layer_container::{cross_entropy_loss_and_softmax, loss, mse_loss_derivative, LayerContainer};
+    use crate::train::layer_container::{cross_entropy_loss_derivative_and_softmax, loss, mse_loss_derivative, LayerContainer};
     use crate::util::util::{accuracy, debug_array, normalize_features};
     use approx::assert_abs_diff_eq;
     use ndarray::{array, Array1, Array2, Axis};
@@ -272,7 +279,7 @@ mod tests {
         let mut sut = LayerContainer::new_layers_boxed(layers);
         for i in 0..100{
             let y_hat = sut.forward(&x);
-            sut.backward_propagation(cross_entropy_loss_and_softmax(&y_hat, &y));
+            sut.backward_propagation(cross_entropy_loss_derivative_and_softmax(&y_hat, &y));
             if i < 20  {
                 let accuracy = accuracy(&y_hat, &y);
                 dbg!(accuracy);

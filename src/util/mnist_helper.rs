@@ -1,5 +1,5 @@
 ﻿use crate::train::layer::{ActivationLayer, Layer};
-use crate::train::layer_container::{cross_entropy_loss_and_softmax, LayerContainer};
+use crate::train::layer_container::{cross_entropy_loss_derivative_and_softmax, LayerContainer};
 use crate::train::loss_functions::softmax;
 use crate::util::util::{accuracy, one_hot};
 use ndarray::{s, Array1, Array2};
@@ -61,7 +61,7 @@ pub fn train_mnist_cnn(x: Array2<f32>, y: Array1<f32>) -> Option<f32>
     let mut sut = LayerContainer::new_layers_boxed(layers);
     for i in 0..500{
         let y_hat = sut.forward(&x_train);
-        sut.backward_propagation(cross_entropy_loss_and_softmax(&y_hat, &y_train));
+        sut.backward_propagation(cross_entropy_loss_derivative_and_softmax(&y_hat, &y_train));
         if i % 100 == 0  {
             let accuracy = accuracy(&y_hat, &y_train);
             dbg!(i, accuracy);
@@ -94,7 +94,7 @@ pub fn train_mnist(x: Array2<f32>, y: Array1<f32>) -> Option<f32>
     let mut sut = LayerContainer::new_layers_boxed(layers);
     for i in 0..500{
         let y_hat = sut.forward(&X_train);
-        sut.backward_propagation(cross_entropy_loss_and_softmax(&y_hat, &y_train));
+        sut.backward_propagation(cross_entropy_loss_derivative_and_softmax(&y_hat, &y_train));
         if i % 100 == 0  {
             let accuracy = accuracy(&y_hat, &y_train);
             dbg!(i, accuracy);

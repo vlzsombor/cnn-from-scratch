@@ -54,10 +54,12 @@ where
     fn get_relu(&self) -> Array<A,D>{
         self.map(|x| x.max(A::zero()))
     }
-    fn get_sigmoid(&self) -> Array<A,D>{
+    fn get_sigmoid(&self) -> Array<A, D> {
         self.map(|x| {
             let one = A::one();
-            one / (one + (-*x).exp())
+            // clamp requires PartialOrd bound on A
+            let x_clamped = x.clamp(-A::from(88.0).unwrap(), A::from(88.0).unwrap());
+            one / (one + (-x_clamped).exp())
         })
     }
     fn get_sigmoid_derivative(&self) -> Array<A, D>{

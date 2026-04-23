@@ -6,6 +6,7 @@ use ndarray_rand::rand::SeedableRng;
 use ndarray_rand::rand_distr::StandardNormal;
 use ndarray_rand::RandomExt;
 use rand_chacha::ChaCha8Rng;
+use crate::train::activation::ReluActivation;
 
 #[derive(Debug)]
 pub struct Layer
@@ -54,6 +55,15 @@ impl ActivationLayer
     {
         Self::new(Activation::relu())
     }
+    pub fn sigmoid() -> Self
+    {
+        let a = Activation{
+            activation: |x| x.to_owned().get_sigmoid(),
+            derivative_activation: |x| x.to_owned().sigmoid_derivative_from_activation(),
+        };
+       Self::new(a)
+    }
+
     pub fn new(activation: Activation) -> Self
     {
         ActivationLayer{
