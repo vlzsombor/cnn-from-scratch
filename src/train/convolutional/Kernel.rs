@@ -1,7 +1,8 @@
 ﻿use ndarray::{s, Array4, ArrayView2};
+use serde::{Deserialize, Serialize};
 use crate::train::convolutional::ImageData::ImageData;
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Kernel{
     kernel: Array4<f32>
 }

@@ -6,9 +6,10 @@ use ndarray_rand::rand::SeedableRng;
 use ndarray_rand::rand_distr::StandardNormal;
 use ndarray_rand::RandomExt;
 use rand_chacha::ChaCha8Rng;
-use crate::train::activation::ReluActivation;
+use serde::{Deserialize, Serialize};
+use crate::train::activation::{ActivationKind, ReluActivation};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Layer
 {
     /// e { features layer X features layer-1}
@@ -21,7 +22,7 @@ pub struct Layer
     alpha: f32
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ActivationLayer
 {
     //    number_of_inputs: u32,
@@ -31,19 +32,21 @@ pub struct ActivationLayer
     /// z e { batch X features }
     z: Array2<f32>
 }
+#[typetag::serde]
 impl Layerable for ActivationLayer
 {
     fn forward(&mut self, X: &Array2<f32>) -> Array2<f32> {
         self.z = X.clone();
-        (&self.activation.activation)(X.view())
+        (&self.activation.activation())(X.view())
 //        X.mapv(&self.activation.activation)
     }
 
     fn backward_propagation(&mut self, dC_da: &Array2<f32>) -> Array2<f32> {
-        let r= (&self.activation.derivative_activation)(self.z.view()) * dC_da;
+        let r= (&self.activation.derivative_activation())(self.z.view()) * dC_da;
         r
 //        self.z.mapv(&self.activation.derivative_activation) * dC_da
     }
+
 }
 impl ActivationLayer
 {
@@ -57,11 +60,12 @@ impl ActivationLayer
     }
     pub fn sigmoid() -> Self
     {
-        let a = Activation{
-            activation: |x| x.to_owned().get_sigmoid(),
-            derivative_activation: |x| x.to_owned().sigmoid_derivative_from_activation(),
-        };
-       Self::new(a)
+        Self::new(Activation::new(ActivationKind::Sigmoid))
+       //  let a = Activation{
+       //      activation: |x| x.to_owned().get_sigmoid(),
+       //      derivative_activation: |x| x.to_owned().sigmoid_derivative_from_activation(),
+       //  };
+       // Self::new(a)
     }
 
     pub fn new(activation: Activation) -> Self
@@ -78,6 +82,7 @@ pub fn xavier(input: usize, out: usize) -> Array2<f32> {
     rand::random::<f32>() * 2.0 * limit - limit
     })
 }
+#[typetag::serde]
 impl Layerable for Layer
 {
     #[allow(non_snake_case)]

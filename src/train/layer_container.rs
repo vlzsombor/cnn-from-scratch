@@ -3,7 +3,9 @@ use crate::train::layer::Layer;
 use crate::train::layerable::Layerable;
 use crate::train::loss_functions::{softmax, EPSILON};
 use ndarray::Array2;
-#[derive(Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LayerContainer {
     pub layers: Vec<Box<dyn Layerable>>
 }

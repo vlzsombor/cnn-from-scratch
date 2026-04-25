@@ -1,10 +1,11 @@
-﻿use ndarray::{array, s, Array1, Array2, Array3, Array4, ArrayView2, Axis, Order};
-use crate::train::activation::ReluActivation;
+﻿use crate::train::activation::ReluActivation;
 use crate::train::layer::{xavier, Activation, Layer};
 use crate::train::layerable::Layerable;
-use crate::util::mnist_helper::{csv_to_image, csv_to_image_oned};
+use crate::util::mnist_helper::csv_to_image;
+use ndarray::{array, s, Array1, Array2, Array3, Array4, ArrayView2};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ConvolutionalLayer {
     image_dimension: usize,
     layer: Layer,
@@ -151,6 +152,8 @@ impl ConvolutionalLayer
         c3
     }
 }
+
+#[typetag::serde]
 impl Layerable for ConvolutionalLayer
 {
 
@@ -233,8 +236,6 @@ fn pad(input: &Array2<f32>, pad: usize, fill: f32) -> Array2<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use approx::assert_abs_diff_eq;
-    use ndarray::array;
 
     #[test]
     fn kernel_idx() {

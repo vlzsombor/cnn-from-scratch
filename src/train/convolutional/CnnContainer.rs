@@ -1,4 +1,5 @@
 use ndarray::{s, Array1, Array2, Array3, Array4, ArrayBase, Dim, Ix1, OwnedRepr, Shape};
+use serde::{Deserialize, Serialize};
 use crate::train::convolutional::CnnLayerable::CnnLayerable;
 use crate::train::convolutional::CnnPoolingLayer::CnnPoolingLayer;
 use crate::train::convolutional::CnnSigmoidActivation::CnnSigmoidActivation;
@@ -8,6 +9,7 @@ use crate::train::layer::{Activation, ActivationLayer, Layer};
 use crate::train::layer_container::LayerContainer;
 use crate::train::layerable::Layerable;
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CnnContainer {
     pub layers: Vec<Box<dyn CnnLayerable>>,
     pub linear_container: LayerContainer,
@@ -44,20 +46,9 @@ impl CnnContainer {
             .fold(image_data.clone(), |acc, layer|{
                 ImageData::new(layer.forward_propagation(&acc))
             });
-
-        if(cnn_res.image.iter().any(|x| x.is_nan())){
-            let cnn_res = self.layers
-                .iter_mut()
-                .fold(image_data.clone(), |acc, layer|{
-//                    dbg!(&acc);
-                    ImageData::new(layer.forward_propagation(&acc))
-                });
-        }
         self.image_data = Some(cnn_res.clone());
         let array2 = cnn_res.image.view().into_shape_with_order((1,cnn_res.image.len())).expect("reshape failed").to_owned();
         let r = self.linear_container.forward(&array2);
-
-
         r
     }
 

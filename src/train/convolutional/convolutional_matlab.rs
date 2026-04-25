@@ -1,14 +1,15 @@
 ﻿use crate::train::activation::ReluActivation;
 use crate::train::layerable::Layerable;
-use ndarray::{s, Array1, Array2, Array3, Array4, ArrayView2};
+use ndarray::{s, Array1, Array2, Array3, Array4, ArrayView1, ArrayView2};
 use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 use crate::train::convolutional::CnnLayerable::CnnLayerable;
 use crate::train::convolutional::ImageData::ImageData;
 use crate::train::convolutional::Kernel::Kernel;
 
 pub const ALPHA: f32 = 0.00001;
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ConvolutionalMatlab
 {
     kernel: Kernel,
@@ -16,6 +17,7 @@ pub struct ConvolutionalMatlab
     alpha: f32,
     cached_input: Option<ImageData>
 }
+#[typetag::serde]
 impl CnnLayerable for ConvolutionalMatlab{
     fn forward_propagation(&mut self, x: &ImageData) -> Array3<f32> {
         self.forward(x)
@@ -23,6 +25,7 @@ impl CnnLayerable for ConvolutionalMatlab{
     fn backward_propagation(&mut self, delta_c: &ImageData) -> Array3<f32> {
         self.backpropagation(delta_c)
     }
+
 }
 impl ConvolutionalMatlab
 {

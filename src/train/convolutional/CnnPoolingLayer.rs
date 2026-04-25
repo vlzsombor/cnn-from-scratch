@@ -1,8 +1,9 @@
 ﻿use ndarray::{s, Array1, Array3, ArrayView1, Axis};
+use serde::{Deserialize, Serialize};
 use crate::train::convolutional::CnnLayerable::CnnLayerable;
 use crate::train::convolutional::ImageData::ImageData;
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct CnnPoolingLayer{}
 
 impl CnnPoolingLayer {
@@ -11,6 +12,7 @@ impl CnnPoolingLayer {
     }
 }
 
+#[typetag::serde]
 impl CnnLayerable for CnnPoolingLayer{
     fn forward_propagation(&mut self, x: &ImageData) -> Array3<f32> {
         let mut pooled = Array3::zeros((x.get_channel_number(),x.get_row()/2,x.get_col()/2));
@@ -41,4 +43,6 @@ impl CnnLayerable for CnnPoolingLayer{
         }
         de_pooled
     }
+
+
 }

@@ -1,23 +1,54 @@
 ﻿use crate::train::loss_functions::softmax;
 use ndarray::{Array, Array2, ArrayBase, ArrayView2, DataMut, Dimension};
 use ndarray_rand::rand_distr::num_traits::Float;
-
-#[derive(Debug)]
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ActivationKind {
+    ReLU,
+    Sigmoid,
+    Softmax,
+}
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Activation{
-    pub activation: fn(ArrayView2<f32>) -> Array2<f32>,
-    pub derivative_activation: fn(ArrayView2<f32>) -> Array2<f32>,
+    pub ActivationKind: ActivationKind
+    // pub activation: fn(ArrayView2<f32>) -> Array2<f32>,
+    // pub derivative_activation: fn(ArrayView2<f32>) -> Array2<f32>,
 }
 impl Activation {
+
+    pub fn new(activation_kind: ActivationKind) -> Self{
+        Activation{
+            ActivationKind: activation_kind
+        }
+    }
     pub fn relu() -> Self{
         Activation{
-            activation: Self::ReLU,
-            derivative_activation: Self::ReLU_derivative,
+            ActivationKind: ActivationKind::ReLU
+            // activation: Self::ReLU,
+            // derivative_activation: Self::ReLU_derivative,
+        }
+    }
+    pub fn activation(&self) -> fn(ArrayView2<'_, f32>) -> Array2<f32> {
+        match self.ActivationKind {
+            ActivationKind::ReLU => Self::ReLU,
+            ActivationKind::Sigmoid =>|x| x.to_owned().get_sigmoid(),
+            ActivationKind::Softmax => softmax,
+        }
+    }
+
+    pub fn derivative_activation(&self) -> fn(ArrayView2<'_, f32>) -> Array2<f32> {
+        match self.ActivationKind {
+            ActivationKind::ReLU => Self::ReLU_derivative,
+            ActivationKind::Sigmoid =>|x| x.to_owned().sigmoid_derivative_from_activation(),
+            ActivationKind::Softmax => |x| Array2::ones(x.raw_dim()),
         }
     }
     pub fn softmax() -> Self{
+
         Activation{
-            activation: softmax,
-            derivative_activation: |x| Array2::ones(x.raw_dim())
+            ActivationKind: ActivationKind::Softmax
+            // activation: softmax,
+            // derivative_activation: |x| Array2::ones(x.raw_dim())
         }
     }
     #[allow(non_snake_case)]
