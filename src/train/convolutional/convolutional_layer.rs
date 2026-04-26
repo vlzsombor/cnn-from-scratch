@@ -212,7 +212,6 @@ impl Layerable for ConvolutionalLayer
             todo!()
         }
         let flat_view = c5.to_shape((120,)).unwrap();
-
         let twodreturn: Array2<f32> = flat_view.to_shape((1,120)).unwrap().into_owned();
         twodreturn
     }

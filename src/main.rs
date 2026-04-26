@@ -13,19 +13,20 @@ pub mod train;
 
 
 fn main() {
-
-    let mut sut = CnnContainer::new_default();
+//    let mut sut = CnnContainer::new_default();
     let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
-    let n_samples = 10;
+    let n_samples = 100;
     let subset: Array2<f32> = x.slice(s![..n_samples, ..]).to_owned();
     let subset = subset.mapv(|x| x/255.);
     let batch: Array3<f32> = subset.into_shape_with_order((n_samples, 28, 28))
         .unwrap()
         .to_owned();
 
+    let json = std::fs::read_to_string("model.json").unwrap();
+    let mut sut: CnnContainer = serde_json::from_str(&json).unwrap();
     let slice: Vec<usize> = y.iter().take(n_samples).map(|&x| x as usize).collect();
     let target = one_hot(&slice, 10);
-    for epoch in 0..=25{
+    for epoch in 0..=10{
         for i in 0..n_samples{
             let x = batch.slice(s![i..i+1, ..,..]).to_owned();
             let image_data = ImageData::new(x);
@@ -41,10 +42,12 @@ fn main() {
         }
         println!("{} ====================", epoch);
     }
-    let bytes = bincode::serialize(&sut).unwrap();
-    std::fs::write("model.bin", &bytes).unwrap();
-    let bytes = std::fs::read("model.bin").unwrap();
-    let mut back: CnnContainer = bincode::deserialize(&bytes).unwrap();
+    let json = serde_json::to_string(&sut).unwrap();
+    std::fs::write("model.json", &json).unwrap();
+    //
+    // Laden
+    let json = std::fs::read_to_string("model.json").unwrap();
+    let mut back: CnnContainer = serde_json::from_str(&json).unwrap();
     println!("====================result");
     for epoch in 0..1{
         for i in 0..n_samples{
@@ -54,9 +57,11 @@ fn main() {
             let target_f = target.slice(s![i..i+1,..]).to_owned();
             let loss = loss(&y_hat, &target_f);
             dbg!(&loss);
-        }
-        println!("{} ====================", epoch);
+        }println!("{} ====================", epoch);
     }
+
+
+
 }
 
 

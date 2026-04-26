@@ -1,8 +1,9 @@
 ﻿use crate::train::activation::ReluActivation;
 use crate::train::layerable::Layerable;
-use ndarray::{s, Array1, Array2, Array3, Array4, ArrayView1, ArrayView2};
+use ndarray::{s, Array1, Array2, Array3, Array4, ArrayView1, ArrayView2, Axis};
 use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
+use crate::save_image;
 use crate::train::convolutional::CnnLayerable::CnnLayerable;
 use crate::train::convolutional::ImageData::ImageData;
 use crate::train::convolutional::Kernel::Kernel;
@@ -69,11 +70,20 @@ impl ConvolutionalMatlab
                 .assign(&acc);
         }
         self.cached_input = Some(x.clone());
+
+        // for output in 0..self.kernel.get_output_channel_number(){
+        //     for input_ch in 0..self.kernel.get_input_channel_number() {
+        //         let k = self.kernel.get_image(input_ch, output);
+        //         let name = format!("kernel{}-{}.png", input_ch, output);
+        //         save_image(&k, &name);
+        //     }
+        // }
+
         return_res
     }
     //todo rethink
     pub fn compute_input_gradient(&self, delta: &ImageData) -> Array3<f32> {
-        let pad = self.kernel.get_col() + 1;
+        let pad = self.kernel.get_col() - 1;
         let in_ch = self.kernel.get_input_channel_number();
         let out_ch = self.kernel.get_output_channel_number();
         let k_h = self.kernel.get_row();
@@ -107,6 +117,13 @@ impl ConvolutionalMatlab
         let grad = self.compute_kernel_gradient(delta_c_p);
         let delta_x = self.compute_input_gradient(delta_c_p);
         self.apply_kernel_update(&grad);
+        let delta_b: Array1<f32> = delta_c_p.image
+            .sum_axis(Axis(1))  // (filters, W)
+            .sum_axis(Axis(1)); // (filters,)
+        for i in 0..self.biases.len() {
+            self.biases[i] -= self.alpha * delta_b[i];
+        }
+
         delta_x
     }
     pub fn compute_kernel_gradient(&self, delta_c_p: &ImageData) -> Array4<f32> {

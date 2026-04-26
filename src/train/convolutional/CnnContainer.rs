@@ -20,17 +20,27 @@ impl CnnContainer {
     pub fn new_default() -> Self{
         let alpha = 0.00001;
         let kernel: Array4<f32> = {
-            let mut k = Array4::zeros((1, 6, 5, 5));
+            let mut k = Array4::ones((1, 6, 5, 5));
             k.slice_mut(s![..,..,1,1]).fill(1.0);
             k
         };
+
+        let kernel2: Array4<f32> = {
+            let mut k = Array4::ones((6, 12, 5, 5));
+            k.slice_mut(s![..,..,1,1]).fill(1.0);
+            k
+        };
+
         let layers: Vec<Box<dyn CnnLayerable>> = vec![
             Box::new(ConvolutionalMatlab::new(kernel, alpha)),
             Box::new(CnnSigmoidActivation::new()),
             Box::new(CnnPoolingLayer::new()),
+            Box::new(ConvolutionalMatlab::new(kernel2, alpha)),
+            Box::new(CnnSigmoidActivation::new()),
+            Box::new(CnnPoolingLayer::new()),
         ];
         let linear_layers: Vec<Box<dyn Layerable>> = vec![
-            Box::new(Layer::new(864, 10, alpha)),
+            Box::new(Layer::new(192, 10, alpha)),
 //            Box::new(ActivationLayer::sigmoid()),
         ];
         let linear_container = LayerContainer::new_layers_boxed(linear_layers);

@@ -36,6 +36,7 @@ impl ImageData{
 
     pub fn get_image_size_after_convolution_image_data(&self, image_data: &ImageData) -> (usize, usize) {
         (self.get_row() - image_data.get_row() + 1, self.get_col() - image_data.get_col() + 1)
+        // (image_data.get_row() - self.get_row() + 1, image_data.get_col() - self.get_col() + 1)
     }
     pub fn get_image_size_after_convolution(&self, kernel: &Kernel) -> (usize, usize) {
         (self.get_row() - kernel.get_row() + 1, self.get_col() - kernel.get_col() + 1)
