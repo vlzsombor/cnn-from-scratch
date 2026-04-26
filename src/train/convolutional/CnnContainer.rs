@@ -5,9 +5,11 @@ use crate::train::convolutional::CnnPoolingLayer::CnnPoolingLayer;
 use crate::train::convolutional::CnnSigmoidActivation::CnnSigmoidActivation;
 use crate::train::convolutional::convolutional_matlab::{ConvolutionalMatlab};
 use crate::train::convolutional::ImageData::ImageData;
-use crate::train::layer::{Activation, ActivationLayer, Layer};
+use crate::train::layer::{xavier, Activation, ActivationLayer, Layer};
 use crate::train::layer_container::LayerContainer;
 use crate::train::layerable::Layerable;
+use crate::util::ndarray_helper;
+use crate::util::ndarray_helper::xavier2;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CnnContainer {
@@ -18,16 +20,17 @@ pub struct CnnContainer {
 
 impl CnnContainer {
     pub fn new_default() -> Self{
-        let alpha = 0.00001;
+        let alpha = 0.01;
         let kernel: Array4<f32> = {
-            let mut k = Array4::ones((1, 6, 5, 5));
-            k.slice_mut(s![..,..,1,1]).fill(1.0);
+            let mut k = xavier2(&[1,6,5,5]).into_dimensionality::<ndarray::Ix4>().expect("kernel initialization failed");
+            // k.slice_mut(s![..,..,1,1]).fill(1.0);
             k
         };
 
         let kernel2: Array4<f32> = {
-            let mut k = Array4::ones((6, 12, 5, 5));
-            k.slice_mut(s![..,..,1,1]).fill(1.0);
+            let mut k = xavier2(&[6, 12, 5, 5])
+                .into_dimensionality::<ndarray::Ix4>()
+                .expect("kernel initialization failed");
             k
         };
 

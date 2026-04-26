@@ -82,6 +82,7 @@ pub fn xavier(input: usize, out: usize) -> Array2<f32> {
     rand::random::<f32>() * 2.0 * limit - limit
     })
 }
+
 #[typetag::serde]
 impl Layerable for Layer
 {
