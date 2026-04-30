@@ -20,7 +20,7 @@ pub struct CnnContainer {
 
 impl CnnContainer {
     pub fn new_default() -> Self{
-        let alpha = 0.01;
+        let alpha = 0.005;
         let kernel: Array4<f32> = {
             let mut k = xavier2(&[1,6,5,5]).into_dimensionality::<ndarray::Ix4>().expect("kernel initialization failed");
             // k.slice_mut(s![..,..,1,1]).fill(1.0);

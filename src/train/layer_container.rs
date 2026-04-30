@@ -64,10 +64,6 @@ impl LayerContainer {
 
 pub fn loss(y_hat: &Array2<f32>, y: &Array2<f32>) -> f32 {
     let r = 1.0 / (y_hat.nrows() as f32) * ((y - y_hat) * (y - y_hat)).sum();
-    if(r.is_nan()){
-        dbg!(&y_hat, &y, r);
-        println!("")
-    }
     r
 }
 
@@ -79,9 +75,12 @@ pub fn cross_entropy_loss_derivative_and_softmax(y_hat: &Array2<f32>, y: &Array2
     let softmax = softmax(y_hat.view());
     softmax - y
 }
-
+pub fn cross_entropy_loss_2(y_hat: &Array2<f32>, y: &Array2<f32>) -> f32 {
+    let softmax = softmax(y_hat.view());
+    let log_softmax = softmax.mapv(|x| x.ln());
+    -(y * &log_softmax).sum()
+}
 pub fn cross_entropy_loss(y_hat: &Array2<f32>, y: &Array2<f32>) -> f32 {
-    let _batch = y_hat.shape()[0] as f32;
     let loss = -( y * y_hat.mapv(|x| (x+EPSILON).ln()) ).sum();
     loss
 }

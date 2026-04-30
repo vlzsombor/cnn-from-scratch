@@ -90,7 +90,7 @@ impl ConvolutionalMatlab
         let k_w = self.kernel.get_col();
 
         let delta_h = delta.image.shape()[1] + 2 * pad;
-        let delta_w = delta.image.shape()[1] + 2 * pad;
+        let delta_w = delta.image.shape()[2] + 2 * pad;
         let out_h = delta_h - k_h + 1;
         let out_w = delta_w - k_w + 1;
 
@@ -102,10 +102,14 @@ impl ConvolutionalMatlab
                 let k_slice = self.kernel.get_image(in_idx, out_idx);
 
                 let d_slice = delta.get_image(out_idx);
-                let mut padded: Array2<f32> = Array2::zeros((d_slice.shape()[0] + 2*pad, d_slice.shape()[1] + 2*pad));
+                let mut padded: Array2<f32> = Array2::zeros((
+                    d_slice.shape()[0] + 2*pad,
+                    d_slice.shape()[1] + 2*pad  // das ist korrekt
+                ));
+                // aber das assign:
                 padded
                     .slice_mut(s![pad..pad+d_slice.shape()[0], pad..pad+d_slice.shape()[1]])
-                    .assign(&d_slice);
+                    .assign(&d_slice); // das ist korrekt
 
                 acc = acc + Self::conv2d(&padded.view(), &k_slice.view());
             }
