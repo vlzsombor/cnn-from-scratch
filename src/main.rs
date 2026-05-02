@@ -4,7 +4,7 @@ extern crate core;
 use crate::train::convolutional::CnnContainer::CnnContainer;
 use crate::train::convolutional::ImageData::ImageData;
 use crate::train::layer_container::{
-    cross_entropy_loss_2, cross_entropy_loss_derivative_and_softmax,
+    cross_entropy_loss, cross_entropy_loss_2, cross_entropy_loss_derivative_and_softmax,
 };
 use crate::util::mnist_helper::load_mnist;
 use crate::util::util::{accuracy, one_hot};
@@ -17,7 +17,8 @@ pub mod util;
 fn main() {
     let mut sut = CnnContainer::new_default();
     let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
-    let n_samples: i32 = 1000;
+    let n_samples: i32 = 160;
+    let epochs: i32 = 100; // 16000;
     let subset: Array2<f32> = x.slice(s![25..25 + n_samples, ..]).to_owned();
     let subset = subset.mapv(|x| x / 255.);
     let batch: Array3<f32> = subset
@@ -25,8 +26,9 @@ fn main() {
         .unwrap()
         .to_owned();
 
-    // let json = std::fs::read_to_string("model.json").unwrap();
-    // let mut sut: CnnContainer = serde_json::from_str(&json).unwrap();
+    let json = std::fs::read_to_string("model.json").unwrap();
+    let mut sut: CnnContainer = serde_json::from_str(&json).unwrap();
+    println!("hello");
     let slice: Vec<usize> = y
         .iter()
         .take(n_samples as usize)
@@ -35,7 +37,7 @@ fn main() {
     let target = one_hot(&slice, 10);
     let mut acc = 0.0;
     let mut lossv = 0.0;
-    for epoch in 1..=100 {
+    for epoch in 1..=epochs {
         for i in 0..n_samples {
             let x = batch.slice(s![i..i + 1, .., ..]).to_owned();
             let image_data = ImageData::new(x);
@@ -44,17 +46,11 @@ fn main() {
             let loss_derivative = cross_entropy_loss_derivative_and_softmax(&y_hat, &target_f);
 
             sut.backward_linear(loss_derivative.clone());
-            if epoch % 1 == 0 {
-                // dbg!(&y_hat, &target_f, &loss_derivative);
-                // let y_hat_post = sut.forward(&image_data);
-                acc = acc + accuracy(&y_hat, &target_f);
-                lossv = lossv + cross_entropy_loss_2(&y_hat, &target_f);
-                // dbg!(&loss_derivative);
-                // let loss = cross_entropy_loss(&y_hat_post, &target_f);
-            }
+            acc += accuracy(&y_hat, &target_f);
+            lossv += cross_entropy_loss_2(&y_hat, &target_f);
         }
         let writeout_epoch = 10;
-        if epoch % writeout_epoch == 0 {
+        if epoch % writeout_epoch == 0 || epoch == epochs {
             dbg!(&(acc / (n_samples * writeout_epoch) as f32));
             dbg!(&(lossv / (n_samples * writeout_epoch) as f32));
             println!("{} ====================", epoch);
@@ -65,22 +61,6 @@ fn main() {
             lossv = 0.;
             let json = serde_json::to_string(&sut).unwrap();
             std::fs::write("model.json", &json).unwrap();
-            // //
-            // // Laden
-            // let json = std::fs::read_to_string("model.json").unwrap();
-            // let mut back: CnnContainer = serde_json::from_str(&json).unwrap();
-            // println!("====================result");
-            // for epoch in 0..1{
-            //     for i in 0..n_samples{
-            //         let x = batch.slice(s![i..i+1, ..,..]).to_owned();
-            //         let image_data = ImageData::new(x);
-            //         let y_hat = back.forward(&image_data);
-            //         let target_f = target.slice(s![i..i+1,..]).to_owned();
-            //         let loss = loss(&y_hat, &target_f);
-            //         dbg!(&loss);
-            //     }
-            //     println!("{} ====================", epoch);
-            // }
         }
     }
 }
