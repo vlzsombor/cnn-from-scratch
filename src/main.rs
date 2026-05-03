@@ -1,4 +1,3 @@
-//todo: 100 samples to 1 accuracy bring, get real loss function of cross entropy loss etc
 extern crate core;
 use crate::train::convolutional::CnnContainer::CnnContainer;
 use crate::train::convolutional::ImageData::ImageData;

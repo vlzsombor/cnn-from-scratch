@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     pub fn test_default_network() {
-        let mut sut = CnnContainer::new_default();
+        let mut sut = CnnContainer::new_default(0.001);
         let (x, y) = load_mnist("src/data/mnist_train_small.csv").unwrap();
         let first = x.row(0); //.unwrap();
         let first = first.mapv(|x| x / 255.);
